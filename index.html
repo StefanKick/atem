@@ -256,7 +256,13 @@
     <div class="field" style="margin-top:8px;"><label>Ruhemessung-Dauer <b><span id="scanDurVal">3</span> Min</b></label><input type="range" id="scanDurRange" min="1" max="10" step="1" value="3"></div>
     <p class="hint">Für verlässliche Frequenz-Werte (LF/HF) mind. 3 Min messen.</p>
   </div>
-  <div class="toggle"><span>Ton (Gleitklang)</span><div class="switch on" id="swSound"></div></div>
+  <div class="toggle"><span>Ton</span><div class="switch on" id="swSound"></div></div>
+  <div class="toggle" id="soundStyleRow"><span>Klangfarbe <small style="color:var(--dim)">(antippen zum Anhören)</small></span>
+    <div class="seg" style="width:auto; flex:none; margin:0;">
+      <button id="stylePad" class="on" style="flex:none; padding:6px 14px;">Weich</button>
+      <button id="styleBell" style="flex:none; padding:6px 14px;">Glocke</button>
+    </div>
+  </div>
   <div class="toggle"><span>Vibration</span><div class="switch on" id="swVibe"></div></div>
   <div class="toggle"><span>Bildschirm anlassen</span><div class="switch on" id="swWake"></div></div>
   <button class="btn ghost" id="closeSheet" style="margin-top:16px;">Fertig</button>
@@ -289,7 +295,7 @@
 const $ = s => document.querySelector(s);
 
 const DEF = { in:4, h1:0, out:6, h2:0, resDurMin:5, resNoLimit:false, hrvDurMin:5, hrvNoLimit:false,
-              scanDurMin:3, sighCount:4, hrvTarget:50, sound:true, vibe:true, wake:true, birthYear:1989 };
+              scanDurMin:3, sighCount:4, hrvTarget:50, sound:true, soundStyle:'pad', vibe:true, wake:true, birthYear:1989 };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -301,7 +307,41 @@ const NORM = {
 /* ---------- Audio ---------- */
 let audioCtx=null;
 function ensureAudio(){ try{ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }catch(e){} }
-function glide(from,to,dur,vol=0.16){ if(!state.settings.sound||!audioCtx) return; const t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type='sine'; o.frequency.setValueAtTime(from,t); o.frequency.linearRampToValueAtTime(to,t+dur); const a=Math.min(0.35,dur*0.3),r=Math.min(0.4,dur*0.35); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+a); g.gain.setValueAtTime(vol,t+Math.max(a,dur-r)); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+dur+0.05); }
+/* Calming breath tone — NO pitch sweep (that caused the siren effect).
+   Fixed warm note per phase; amplitude swells in/out gently. Two styles. */
+function glide(from,to,dur){
+  if(!state.settings.sound||!audioCtx) return;
+  const inhale = to>=from;                 // call sites pass rising for inhale, falling for exhale
+  if(state.settings.soundStyle==='bell') breathBell(inhale?432:324, dur);
+  else breathPad(inhale?300:225, dur);      // warm mid register, a calm fourth apart
+}
+function breathPad(base,dur){
+  const t=audioCtx.currentTime, vol=0.13;
+  const lp=audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1100; lp.Q.value=0.2;
+  const g=audioCtx.createGain();
+  const atk=Math.min(1.3,dur*0.4), rel=Math.min(1.8,dur*0.5);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+atk);
+  g.gain.setValueAtTime(vol,t+Math.max(atk,dur-rel));
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  const o1=audioCtx.createOscillator(); o1.type='triangle'; o1.frequency.value=base;        // warm fundamental
+  const o2=audioCtx.createOscillator(); o2.type='sine'; o2.frequency.value=base*2;            // soft octave shimmer
+  const g2=audioCtx.createGain(); g2.gain.value=0.28;
+  const o3=audioCtx.createOscillator(); o3.type='sine'; o3.frequency.value=base*1.5;          // gentle fifth for warmth
+  const g3=audioCtx.createGain(); g3.gain.value=0.18;
+  o1.connect(g); o2.connect(g2).connect(g); o3.connect(g3).connect(g); g.connect(lp).connect(audioCtx.destination);
+  const stop=t+dur+0.15; o1.start(t);o2.start(t);o3.start(t); o1.stop(stop);o2.stop(stop);o3.stop(stop);
+}
+function breathBell(base,dur){
+  const t=audioCtx.currentTime, vol=0.16, ring=Math.min(dur,3.0);
+  const g=audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+ring);
+  const o1=audioCtx.createOscillator(); o1.type='sine'; o1.frequency.value=base;
+  const o2=audioCtx.createOscillator(); o2.type='sine'; o2.frequency.value=base*2.4;          // soft inharmonic partial → bell-like
+  const g2=audioCtx.createGain(); g2.gain.value=0.16;
+  o1.connect(g); o2.connect(g2).connect(g); g.connect(audioCtx.destination);
+  const stop=t+ring+0.1; o1.start(t);o2.start(t); o1.stop(stop);o2.stop(stop);
+}
 function chime(f=520,dur=0.5,vol=0.2){ if(!state.settings.sound||!audioCtx) return; const t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+dur+0.05); }
 function vibrate(p){ if(state.settings.vibe && navigator.vibrate) try{navigator.vibrate(p);}catch(e){} }
 
@@ -466,10 +506,14 @@ bindRange('#durRange','resDurMin','#durVal',()=>{ if(!state.running) resetStatsL
 bindRange('#hrvDurRange','hrvDurMin','#hrvDurVal'); bindRange('#scanDurRange','scanDurMin','#scanDurVal');
 $('#sighRange').addEventListener('input',e=>{ state.settings.sighCount=+e.target.value; $('#sighVal').textContent=e.target.value; });
 document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{ state.settings.in=+c.dataset.in; state.settings.out=+c.dataset.out; state.settings.h1=0; state.settings.h2=0; syncControls(); syncHint(); }));
-function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; subLabel.textContent=subText(); }
+function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; syncSoundStyle(); subLabel.textContent=subText(); }
 function syncHint(){ const s=state.settings, cyc=s.in+s.h1+s.out+s.h2, bpm=(60/cyc).toFixed(1); let msg=`≈ ${bpm} Atemzüge/Min.`; if(bpm>=4.5&&bpm<=7) msg+=' 👍 Im Resonanz-Bereich — ideal für die HRV.'; else if(bpm>7) msg+=' Tipp: Für maximale HRV langsamer (4,5–7/Min).'; $('#rateHint').textContent=msg; document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',+c.dataset.in===s.in&&+c.dataset.out===s.out&&s.h1===0&&s.h2===0)); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; if(!state.running) subLabel.textContent=subText(); }
 function bindSwitch(id,key,cb){ const el=$(id); el.classList.toggle('on',state.settings[key]); el.addEventListener('click',()=>{ state.settings[key]=!state.settings[key]; el.classList.toggle('on',state.settings[key]); cb&&cb(); save(); }); }
-bindSwitch('#swSound','sound'); bindSwitch('#swVibe','vibe'); bindSwitch('#swWake','wake',()=>{ if(!state.settings.wake) relWake(); else if(state.running) reqWake(); });
+bindSwitch('#swSound','sound',()=>{ if(state.settings.sound) previewTone(); }); bindSwitch('#swVibe','vibe');
+$('#stylePad').addEventListener('click',()=>{ state.settings.soundStyle='pad'; syncSoundStyle(); save(); previewTone(); });
+$('#styleBell').addEventListener('click',()=>{ state.settings.soundStyle='bell'; syncSoundStyle(); save(); previewTone(); });
+function syncSoundStyle(){ $('#stylePad').classList.toggle('on',state.settings.soundStyle==='pad'); $('#styleBell').classList.toggle('on',state.settings.soundStyle==='bell'); }
+function previewTone(){ if(!state.settings.sound) return; ensureAudio(); glide(196,392,2.6); } bindSwitch('#swWake','wake',()=>{ if(!state.settings.wake) relWake(); else if(state.running) reqWake(); });
 bindSwitch('#swResNoLimit','resNoLimit',()=>{ $('#resDurField').classList.toggle('dim',state.settings.resNoLimit); if(!state.running) resetStatsLabels(); });
 bindSwitch('#swHrvNoLimit','hrvNoLimit',()=>{ $('#hrvDurField').classList.toggle('dim',state.settings.hrvNoLimit); });
 

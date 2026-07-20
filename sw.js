@@ -3,7 +3,7 @@
    - HTML/navigation: network-first (always fresh when online, cache fallback offline)
    - other assets: cache-first with background update
    Bump CACHE on each release so old caches are purged. */
-const CACHE = 'atem-v3';
+const CACHE = 'atem-v4';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
