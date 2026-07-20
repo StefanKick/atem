@@ -119,6 +119,8 @@
   .h-row .met{text-align:right; font-size:12px; color:var(--dim); white-space:nowrap;}
   .h-row .met b{color:var(--txt); font-size:14px;}
   .h-row .chev{color:var(--dim); font-size:16px;}
+  .h-row .h-del{width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#1d2c44; border:1px solid var(--line); color:var(--dim); font-size:13px; flex:none; cursor:pointer;}
+  .h-row .h-del:active{background:#3a2030; color:#ff8080;}
   .empty{color:var(--dim); text-align:center; padding:30px 10px; font-size:14px; line-height:1.6;}
   .accordion{margin-top:14px; border-top:1px solid var(--line); padding-top:12px;}
   .accordion summary{font-size:13px; color:var(--dim); cursor:pointer; list-style:none;}
@@ -324,6 +326,7 @@
     <div class="sec-h">Alle HRV-Kennzahlen</div>
     <table class="mtable"><thead><tr><th>Kennzahl</th><th style="text-align:right">Wert</th><th style="text-align:right">Einordnung</th></tr></thead><tbody id="metricRows"></tbody></table>
     <p class="disclaimer" id="resDisclaimer"></p>
+    <button class="btn ghost sm" id="resDelBtn" style="margin:4px auto 0; max-width:280px; color:#b56;">Diese Sitzung löschen</button>
     </div>
   </div>
 </div>
@@ -839,8 +842,10 @@ function updateLiveInterpret(){ if(state.hrvSub==='scan') return; const el=$('#l
    ============================================================ */
 function zonesFromCoh(serCoh,target){ const v=serCoh.filter(x=>x>0); if(!v.length) return {low:0,mid:0,high:0}; let lo=0,mi=0,hi=0; const a=target/3, b=2*target/3; v.forEach(x=>{ if(x<a) lo++; else if(x<b) mi++; else hi++; }); const n=v.length; return {low:Math.round(lo/n*100),mid:Math.round(mi/n*100),high:Math.round(hi/n*100)}; }
 
+let curResult=null;
 function openResult(r){
   $('#resStd').classList.remove('hide'); $('#resTestView').classList.add('hide');
+  curResult={ts:r.ts, mode:r.mode};
   const isScan=r.mode==='scan';
   $('#resSub').textContent = `${isScan?'Ruhemessung':'HRV-Training'} · ${fmtDate(r.ts||Date.now())} · ${fmtM(r.dur)} · Qualität ${r.quality!=null?r.quality+'%':'–'}`;
   // ring + zones + cards (training only)
@@ -870,6 +875,7 @@ function openResult(r){
 }
 function card(v,l){ return `<div class="res-card"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
 $('#resClose').addEventListener('click',()=>{ $('#result').classList.remove('open'); if(state.mode==='history') renderHistory(); });
+$('#resDelBtn').addEventListener('click',()=>{ if(!curResult) return; if(confirm('Diese Sitzung löschen?')){ const h=loadHist(), i=h.findIndex(r=>r.ts===curResult.ts && r.mode===curResult.mode); if(i>=0){ h.splice(i,1); saveHist(h); } curResult=null; $('#result').classList.remove('open'); if(state.mode==='history') renderHistory(); toast('Sitzung gelöscht.'); } });
 
 function drawRing(z,success){
   const cv=$('#ringCanvas'), ctx=cv.getContext('2d'), W=400, cx=200, cy=200;
@@ -1000,9 +1006,10 @@ function renderHistory(){
     else if(r.mode==='garmin') met=`<b>${Math.round(r.rmssd)}</b> ms Nacht${r.g7!=null?` · Ø7 ${r.g7}`:''}`;
     else if(r.mode==='sigh') met=`<b>${r.cycles}</b> Seufzer`; else met=`<b>${r.breaths||0}</b> Atemzüge`;
     const clickable=(r.mode==='hrv'||r.mode==='scan');
-    return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${m.n}${r.mode==='garmin'?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div>${clickable?'<div class="chev">›</div>':''}</div>`;
+    return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${m.n}${r.mode==='garmin'?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
   }).join('');
   document.querySelectorAll('#histList .h-row[data-idx]').forEach(el=>el.addEventListener('click',()=>{ const r=loadHist()[+el.dataset.idx]; if(r) openResult(r); }));
+  document.querySelectorAll('#histList .h-del').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const idx=+el.dataset.del, hh=loadHist(), r=hh[idx]; if(!r) return; const m=MODE_META[r.mode]||{n:r.mode}; if(confirm(`Diesen Eintrag löschen?\n${m.n} · ${fmtDate(r.ts)}`)){ hh.splice(idx,1); saveHist(hh); renderHistory(); toast('Eintrag gelöscht.'); } }));
   $('#glossaryBody').innerHTML=GLOSSARY;
 }
 function renderTrend(h){
