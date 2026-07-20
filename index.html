@@ -263,6 +263,15 @@
       <button id="styleBell" style="flex:none; padding:6px 14px;">Glocke</button>
     </div>
   </div>
+  <div class="toggle"><span>Hintergrund <small style="color:var(--dim)">(antippen zum Anhören)</small></span>
+    <div class="seg" style="width:auto; flex:none; margin:0;">
+      <button id="bgOff" class="on" style="flex:none; padding:6px 11px;">Aus</button>
+      <button id="bgOcean" style="flex:none; padding:6px 11px;">Meer</button>
+      <button id="bgDrone" style="flex:none; padding:6px 11px;">Drone</button>
+    </div>
+  </div>
+  <div class="field" id="bgVolField" style="margin:10px 0 4px;"><label>Hintergrund-Lautstärke <b><span id="bgVolVal">50</span> %</b></label><input type="range" id="bgVolRange" min="0" max="100" step="5" value="50"></div>
+  <p class="hint" style="margin-bottom:8px;">„Meer" ist an den Atem gekoppelt: Brandung wächst beim Einatmen, ebbt beim Ausatmen — so trennst du Ein-/Ausatmen auch mit geschlossenen Augen.</p>
   <div class="toggle"><span>Vibration</span><div class="switch on" id="swVibe"></div></div>
   <div class="toggle"><span>Bildschirm anlassen</span><div class="switch on" id="swWake"></div></div>
   <button class="btn ghost" id="closeSheet" style="margin-top:16px;">Fertig</button>
@@ -295,7 +304,7 @@
 const $ = s => document.querySelector(s);
 
 const DEF = { in:4, h1:0, out:6, h2:0, resDurMin:5, resNoLimit:false, hrvDurMin:5, hrvNoLimit:false,
-              scanDurMin:3, sighCount:4, hrvTarget:50, sound:true, soundStyle:'pad', vibe:true, wake:true, birthYear:1989 };
+              scanDurMin:3, sighCount:4, hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, vibe:true, wake:true, birthYear:1989 };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -342,6 +351,38 @@ function breathBell(base,dur){
   o1.connect(g); o2.connect(g2).connect(g); g.connect(audioCtx.destination);
   const stop=t+ring+0.1; o1.start(t);o2.start(t); o1.stop(stop);o2.stop(stop);
 }
+
+/* ---------- Ambient background (procedural, breath-coupled) ---------- */
+let amb=null, bgPrevTimer=null;
+function oceanBuf(){ if(oceanBuf._b) return oceanBuf._b; const len=Math.floor(audioCtx.sampleRate*6); const b=audioCtx.createBuffer(1,len,audioCtx.sampleRate); const d=b.getChannelData(0); let last=0; for(let i=0;i<len;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.2; } oceanBuf._b=b; return b; }
+function startAmbient(){
+  const kind=state.settings.bg; if(kind==='off'||!audioCtx) return; stopAmbient(true);
+  const vol=(state.settings.bgVol!=null?state.settings.bgVol:0.5);
+  const master=audioCtx.createGain(); master.gain.value=0.0001; master.connect(audioCtx.destination); const t=audioCtx.currentTime;
+  if(kind==='ocean'){
+    const src=audioCtx.createBufferSource(); src.buffer=oceanBuf(); src.loop=true;
+    const hp=audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=60;
+    const lp=audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=600; lp.Q.value=0.4;
+    src.connect(hp).connect(lp).connect(master); src.start();
+    amb={kind,master,src,lp,vol}; master.gain.exponentialRampToValueAtTime(0.12*vol+0.0001,t+2);
+  } else if(kind==='drone'){
+    const mix=audioCtx.createGain(); mix.gain.value=1;
+    const lp=audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=700; lp.Q.value=0.5;
+    const notes=[[130.81,'triangle',0.5],[196.00,'sine',0.24],[261.63,'sine',0.18]];
+    const oscs=notes.map(([f,ty,gv])=>{ const o=audioCtx.createOscillator(); o.type=ty; o.frequency.value=f; const g=audioCtx.createGain(); g.gain.value=gv; o.connect(g).connect(mix); o.start(); return o; });
+    mix.connect(lp).connect(master); amb={kind,master,oscs,lp,vol}; master.gain.exponentialRampToValueAtTime(0.17*vol+0.0001,t+2);
+  }
+}
+function stopAmbient(immediate){ if(!amb) return; const a=amb; amb=null; const t=audioCtx.currentTime;
+  try{ a.master.gain.cancelScheduledValues(t); a.master.gain.setValueAtTime(Math.max(0.0001,a.master.gain.value),t); a.master.gain.exponentialRampToValueAtTime(0.0001,t+(immediate?0.05:0.8)); }catch(e){}
+  const s=t+(immediate?0.12:0.95); try{ a.src&&a.src.stop(s); }catch(e){} try{ a.oscs&&a.oscs.forEach(o=>o.stop(s)); }catch(e){} }
+function ambientPhase(ph){ if(!amb||!audioCtx) return; const t=audioCtx.currentTime, dur=ph.dur||3, vol=amb.vol;
+  const inhale=(ph.name==='Einatmen'||ph.name==='Nachziehen'), exhale=(ph.name==='Ausatmen');
+  if(amb.kind==='ocean'){ const gTgt=inhale?0.5*vol:(exhale?0.06*vol:0.12*vol), cTgt=inhale?1150:(exhale?360:600);
+    try{ const g=amb.master.gain; g.cancelScheduledValues(t); g.setValueAtTime(Math.max(0.0001,g.value),t); g.linearRampToValueAtTime(Math.max(0.0001,gTgt),t+dur*0.9);
+      const f=amb.lp.frequency; f.cancelScheduledValues(t); f.setValueAtTime(f.value,t); f.linearRampToValueAtTime(cTgt,t+dur*0.9); }catch(e){} }
+  else if(amb.kind==='drone'){ const cTgt=inhale?1000:(exhale?520:700); try{ const f=amb.lp.frequency; f.cancelScheduledValues(t); f.setValueAtTime(f.value,t); f.linearRampToValueAtTime(cTgt,t+dur*0.9); }catch(e){} } }
+function previewBg(){ ensureAudio(); if(state.running){ stopAmbient(true); startAmbient(); return; } clearTimeout(bgPrevTimer); stopAmbient(true); if(state.settings.bg!=='off'){ startAmbient(); bgPrevTimer=setTimeout(()=>stopAmbient(),6000); } }
 function chime(f=520,dur=0.5,vol=0.2){ if(!state.settings.sound||!audioCtx) return; const t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+dur+0.05); }
 function vibrate(p){ if(state.settings.vibe && navigator.vibrate) try{navigator.vibrate(p);}catch(e){} }
 
@@ -372,11 +413,12 @@ function startBreathing(isHrv){
   const t0=performance.now(); let idx=0, breaths=0, phaseStart=performance.now();
   engine={timer:null,raf:null};
   if(isHrv) startRec('train');
+  startAmbient();
   document.querySelectorAll('#statsRow .l')[0].textContent = noLimit?'Zeit':'Restzeit';
   document.querySelectorAll('#statsRow .l')[1].textContent = 'Atemzüge';
   function enter(i){ const ph=seq[i]; phaseStart=performance.now(); phaseLabel.textContent=ph.name;
     setScale(orb,ph.scale,ph.dur); setScale(orbCore,ph.scale===1.0?1.0:.5,ph.dur);
-    if(ph.glide) glide(ph.glide[0],ph.glide[1],ph.dur); if(ph.vibe) vibrate(ph.vibe);
+    if(ph.glide) glide(ph.glide[0],ph.glide[1],ph.dur); if(ph.vibe) vibrate(ph.vibe); ambientPhase(ph);
     if(ph.breath){ breaths++; if(!isHrv) $('#statBreaths').textContent=breaths; }
     engine.timer=setTimeout(()=>{ idx=(idx+1)%seq.length; enter(idx); }, ph.dur*1000); }
   function tick(){ const now=performance.now(), elapsed=now-t0;
@@ -386,13 +428,13 @@ function startBreathing(isHrv){
   engine._meta={isHrv,scan:false,breaths:()=>breaths,elapsed:()=>performance.now()-t0};
   enter(0); tick();
 }
-function finishResonance(breaths,elapsedMs){ stopEngine(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.42,2); setScale(orbCore,.5,2); logSession({mode:'resonance',dur:Math.round(elapsedMs/1000),breaths}); subLabel.textContent=`${breaths} Atemzüge · gespeichert ✓`; relWake(); setRunning(false); }
+function finishResonance(breaths,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.42,2); setScale(orbCore,.5,2); logSession({mode:'resonance',dur:Math.round(elapsedMs/1000),breaths}); subLabel.textContent=`${breaths} Atemzüge · gespeichert ✓`; relWake(); setRunning(false); }
 function doneChime(){ chime(660,0.6); setTimeout(()=>chime(880,0.7),180); vibrate([120,80,120]); }
 
 /* ---------- Resting scan (no pacing) ---------- */
 function startScan(){
   const durMs=state.settings.scanDurMin*60*1000, t0=performance.now();
-  engine={timer:null,raf:null}; startRec('scan');
+  engine={timer:null,raf:null}; startRec('scan'); startAmbient();
   phaseLabel.textContent='Ruhemessung'; subLabel.textContent='Ruhig sitzen, normal atmen — nicht sprechen';
   setScale(orb,.7,2); setScale(orbCore,.6,2);
   function tick(){ const el=performance.now()-t0, rem=Math.max(0,durMs-el); $('#hrvTime').textContent=fmt(rem);
@@ -417,7 +459,7 @@ function finishHrv(elapsedMs){
     rec.success=state.settings.hrvTarget?Math.round(cohAvg/state.settings.hrvTarget*100):0;
     rec.zones=z; adaptTarget(cohAvg);
   }
-  logSession(rec); relWake(); setRunning(false);
+  logSession(rec); stopAmbient(); relWake(); setRunning(false);
   subLabel.textContent='Sitzung gespeichert ✓';
   openResult(rec);
 }
@@ -427,13 +469,13 @@ function adaptTarget(cohAvg){ let t=state.settings.hrvTarget; t=Math.round(0.7*t
 function startSigh(){
   const n=state.settings.sighCount; let cycle=0; const t0=performance.now(); engine={timer:null,raf:null};
   document.querySelectorAll('#statsRow .l')[0].textContent='Ziel'; document.querySelectorAll('#statsRow .l')[1].textContent='Erledigt';
-  $('#statTime').textContent=n; $('#statBreaths').textContent=0;
+  $('#statTime').textContent=n; $('#statBreaths').textContent=0; startAmbient();
   const steps=[{name:'Einatmen',sub:'tief durch die Nase',dur:1.6,scale:.85,glide:[196,340],vibe:70},{name:'Nachziehen',sub:'noch ein kleiner Zug',dur:1.0,scale:1.0,glide:[340,440],vibe:40},{name:'Ausatmen',sub:'lang durch den Mund',dur:6.0,scale:.42,glide:[440,180],vibe:[0,70]},{name:'Pause',sub:'kurz ruhen',dur:1.4,scale:.42,glide:null,vibe:20}];
-  function enter(k){ const st=steps[k]; phaseLabel.textContent=st.name; subLabel.textContent=st.sub; countNum.textContent=''; setScale(orb,st.scale,st.dur); setScale(orbCore,st.scale===1.0?1.0:.5,st.dur); if(st.glide) glide(st.glide[0],st.glide[1],st.dur); if(st.vibe) vibrate(st.vibe);
+  function enter(k){ const st=steps[k]; phaseLabel.textContent=st.name; subLabel.textContent=st.sub; countNum.textContent=''; setScale(orb,st.scale,st.dur); setScale(orbCore,st.scale===1.0?1.0:.5,st.dur); if(st.glide) glide(st.glide[0],st.glide[1],st.dur); if(st.vibe) vibrate(st.vibe); ambientPhase(st);
     engine.timer=setTimeout(()=>{ let nx=k+1; if(nx>=steps.length){ cycle++; $('#statBreaths').textContent=cycle; if(cycle>=n){ finishSigh(cycle,performance.now()-t0); return; } nx=0; } enter(nx); }, st.dur*1000); }
   enter(0);
 }
-function finishSigh(count,elapsedMs){ stopEngine(); doneChime(); phaseLabel.textContent='Fertig ✓'; subLabel.textContent=`${count} Seufzer · gespeichert ✓`; countNum.textContent=''; setScale(orb,.42,2); setScale(orbCore,.5,2); logSession({mode:'sigh',dur:Math.round(elapsedMs/1000),cycles:count}); relWake(); setRunning(false); }
+function finishSigh(count,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; subLabel.textContent=`${count} Seufzer · gespeichert ✓`; countNum.textContent=''; setScale(orb,.42,2); setScale(orbCore,.5,2); logSession({mode:'sigh',dur:Math.round(elapsedMs/1000),cycles:count}); relWake(); setRunning(false); }
 
 /* ---------- Start/Stop ---------- */
 function setRunning(on){ state.running=on; const b=$('#startBtn'); b.textContent=on?'Stopp':'Start'; b.classList.toggle('stop',on); }
@@ -445,7 +487,7 @@ startBtn.addEventListener('click',()=>{
     stopEngine();
     if(meta){ if(meta.isHrv){ if(meta.elapsed>20000){ finishHrv(meta.elapsed); return; } else { stopRec(); } }
               else if(meta.elapsed>15000){ logSession({mode:'resonance',dur:Math.round(meta.elapsed/1000),breaths:meta.breaths}); } }
-    relWake(); resetOrb(); phaseLabel.textContent='Bereit'; subLabel.textContent=subText(); setRunning(false); return;
+    stopAmbient(); relWake(); resetOrb(); phaseLabel.textContent='Bereit'; subLabel.textContent=subText(); setRunning(false); return;
   }
   resetOrb(); reqWake(); setRunning(true);
   if(state.mode==='resonance'){ $('#statBreaths').textContent=0; startBreathing(false); }
@@ -456,7 +498,7 @@ startBtn.addEventListener('click',()=>{
 /* ---------- Modes / tabs ---------- */
 function subText(){ const s=state.settings; if(state.mode==='resonance'){ const bpm=(60/(s.in+s.h1+s.out+s.h2)).toFixed(1); return `${s.in} Sek ein · ${s.out} Sek aus — ${bpm} Atemzüge/Min`; } if(state.mode==='sigh') return 'Doppel-Einatmung, langer Ausatem — 3–4× bei Seitenstechen'; if(state.mode==='hrv') return state.hrvSub==='scan'?'Ruhig sitzen — misst deine Baseline-HRV':'Start drücken, mit dem Kreis atmen'; return ''; }
 function switchMode(m){
-  if(state.running){ stopEngine(); if(engine&&engine._meta&&engine._meta.isHrv) stopRec(); relWake(); setRunning(false); }
+  if(state.running){ stopEngine(); if(engine&&engine._meta&&engine._meta.isHrv) stopRec(); stopAmbient(true); relWake(); setRunning(false); }
   state.mode=m;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===m));
   const titles={resonance:'Resonanz-Atmung',sigh:'Physiological Sigh',hrv:'HRV Live-Biofeedback',history:'Verlauf & Fortschritt'};
@@ -498,7 +540,7 @@ function applyHrvSub(){
 /* ---------- Settings sheet ---------- */
 const sheet=$('#sheet'), sheetBg=$('#sheetBg');
 $('#gearBtn').addEventListener('click',()=>{ sheet.classList.add('open'); sheetBg.classList.add('open'); });
-function closeSheet(){ sheet.classList.remove('open'); sheetBg.classList.remove('open'); save(); }
+function closeSheet(){ sheet.classList.remove('open'); sheetBg.classList.remove('open'); if(!state.running){ clearTimeout(bgPrevTimer); stopAmbient(true); } save(); }
 $('#closeSheet').addEventListener('click',closeSheet); sheetBg.addEventListener('click',closeSheet);
 function bindRange(id,key,out,after){ const r=$(id); r.addEventListener('input',()=>{ state.settings[key]=parseFloat(r.value); $(out).textContent=r.value; after&&after(); }); }
 bindRange('#inRange','in','#inVal',syncHint); bindRange('#h1Range','h1','#h1Val',syncHint); bindRange('#outRange','out','#outVal',syncHint); bindRange('#h2Range','h2','#h2Val',syncHint);
@@ -506,14 +548,20 @@ bindRange('#durRange','resDurMin','#durVal',()=>{ if(!state.running) resetStatsL
 bindRange('#hrvDurRange','hrvDurMin','#hrvDurVal'); bindRange('#scanDurRange','scanDurMin','#scanDurVal');
 $('#sighRange').addEventListener('input',e=>{ state.settings.sighCount=+e.target.value; $('#sighVal').textContent=e.target.value; });
 document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{ state.settings.in=+c.dataset.in; state.settings.out=+c.dataset.out; state.settings.h1=0; state.settings.h2=0; syncControls(); syncHint(); }));
-function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; syncSoundStyle(); subLabel.textContent=subText(); }
+function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; syncSoundStyle(); syncBg(); $('#bgVolRange').value=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); $('#bgVolVal').textContent=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); subLabel.textContent=subText(); }
 function syncHint(){ const s=state.settings, cyc=s.in+s.h1+s.out+s.h2, bpm=(60/cyc).toFixed(1); let msg=`≈ ${bpm} Atemzüge/Min.`; if(bpm>=4.5&&bpm<=7) msg+=' 👍 Im Resonanz-Bereich — ideal für die HRV.'; else if(bpm>7) msg+=' Tipp: Für maximale HRV langsamer (4,5–7/Min).'; $('#rateHint').textContent=msg; document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',+c.dataset.in===s.in&&+c.dataset.out===s.out&&s.h1===0&&s.h2===0)); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; if(!state.running) subLabel.textContent=subText(); }
 function bindSwitch(id,key,cb){ const el=$(id); el.classList.toggle('on',state.settings[key]); el.addEventListener('click',()=>{ state.settings[key]=!state.settings[key]; el.classList.toggle('on',state.settings[key]); cb&&cb(); save(); }); }
 bindSwitch('#swSound','sound',()=>{ if(state.settings.sound) previewTone(); }); bindSwitch('#swVibe','vibe');
 $('#stylePad').addEventListener('click',()=>{ state.settings.soundStyle='pad'; syncSoundStyle(); save(); previewTone(); });
 $('#styleBell').addEventListener('click',()=>{ state.settings.soundStyle='bell'; syncSoundStyle(); save(); previewTone(); });
 function syncSoundStyle(){ $('#stylePad').classList.toggle('on',state.settings.soundStyle==='pad'); $('#styleBell').classList.toggle('on',state.settings.soundStyle==='bell'); }
-function previewTone(){ if(!state.settings.sound) return; ensureAudio(); glide(196,392,2.6); } bindSwitch('#swWake','wake',()=>{ if(!state.settings.wake) relWake(); else if(state.running) reqWake(); });
+function previewTone(){ if(!state.settings.sound) return; ensureAudio(); glide(196,392,2.6); }
+$('#bgOff').addEventListener('click',()=>setBg('off'));
+$('#bgOcean').addEventListener('click',()=>setBg('ocean'));
+$('#bgDrone').addEventListener('click',()=>setBg('drone'));
+function setBg(k){ state.settings.bg=k; syncBg(); save(); previewBg(); }
+function syncBg(){ $('#bgOff').classList.toggle('on',state.settings.bg==='off'); $('#bgOcean').classList.toggle('on',state.settings.bg==='ocean'); $('#bgDrone').classList.toggle('on',state.settings.bg==='drone'); }
+$('#bgVolRange').addEventListener('input',e=>{ const v=+e.target.value; state.settings.bgVol=v/100; $('#bgVolVal').textContent=v; if(amb){ amb.vol=state.settings.bgVol; try{ const base=amb.kind==='drone'?0.17*amb.vol:0.12*amb.vol; amb.master.gain.linearRampToValueAtTime(Math.max(0.0001,base),audioCtx.currentTime+0.3); }catch(e){} } save(); }); bindSwitch('#swWake','wake',()=>{ if(!state.settings.wake) relWake(); else if(state.running) reqWake(); });
 bindSwitch('#swResNoLimit','resNoLimit',()=>{ $('#resDurField').classList.toggle('dim',state.settings.resNoLimit); if(!state.running) resetStatsLabels(); });
 bindSwitch('#swHrvNoLimit','hrvNoLimit',()=>{ $('#hrvDurField').classList.toggle('dim',state.settings.hrvNoLimit); });
 
