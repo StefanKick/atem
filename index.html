@@ -208,7 +208,7 @@
       <div class="h-card"><div class="v" id="hcSessions">0</div><div class="l">Sitzungen</div></div>
       <div class="h-card"><div class="v" id="hcMinutes">0</div><div class="l">Minuten gesamt</div></div>
       <div class="h-card"><div class="v" id="hcStreak">0</div><div class="l">Serie (Tage)</div></div>
-      <div class="h-card"><div class="v" id="hcRmssd">–</div><div class="l">Ø RMSSD Ruhe (5)</div></div>
+      <div class="h-card"><div class="v" id="hcRmssd">–</div><div class="l" id="hcRmssdLbl">Ø RMSSD Ruhe (5)</div></div>
     </div>
     <div class="interpret" id="histInterpret"></div>
     <div class="trend-seg" id="trendSeg"></div>
@@ -219,8 +219,10 @@
       <button class="btn ghost sm" id="exportBtn">Backup exportieren</button>
       <button class="btn ghost sm" id="importBtn">Import</button>
     </div>
+    <button class="btn ghost sm" id="garminBtn" style="margin-top:10px; max-width:460px;">🌙 Garmin Nacht-HRV importieren (CSV)</button>
     <button class="btn ghost sm" id="clearBtn" style="margin-top:10px; max-width:460px; color:#b56;">Verlauf löschen</button>
     <input type="file" id="importFile" accept="application/json" class="hide">
+    <input type="file" id="garminFile" accept=".csv,text/csv" class="hide">
     <details class="accordion"><summary>Was bedeuten die Werte? ▾</summary><div class="body" id="glossaryBody"></div></details>
     <p class="disclaimer">Orientierungshilfe für dein Training — kein medizinisches Diagnosewerkzeug. Normwerte: Nunan 2010 / Shaffer &amp; Ginsberg 2017 (Ruhe, 5 Min). Bei gesundheitlichen Fragen ärztlichen Rat einholen.</p>
   </div>
@@ -855,22 +857,26 @@ function loadHist(){ try{ return JSON.parse(localStorage.getItem('atem_history')
 function saveHist(h){ try{ localStorage.setItem('atem_history', JSON.stringify(h)); }catch(e){ toast('Speichern fehlgeschlagen (Speicher voll?).'); } }
 function logSession(r){ const h=loadHist(); r.ts=Date.now(); h.push(r); if(h.length>3000) h.splice(0,h.length-3000); saveHist(h); }
 
-const MODE_META={resonance:{i:'🫁',n:'Resonanz'},sigh:{i:'🌬️',n:'Seufzer'},hrv:{i:'💓',n:'HRV Training'},scan:{i:'🩺',n:'Ruhemessung'}};
+const MODE_META={resonance:{i:'🫁',n:'Resonanz'},sigh:{i:'🌬️',n:'Seufzer'},hrv:{i:'💓',n:'HRV Training'},scan:{i:'🩺',n:'Ruhemessung'},garmin:{i:'🌙',n:'Garmin Nacht-HRV'}};
+const ACTIVE_MODES=['resonance','sigh','hrv','scan']; // aktive Übungen (Garmin = passive Daten)
 function fmtDate(ts){ const d=new Date(ts), now=new Date(); const sd=d.toDateString()===now.toDateString(); const yd=new Date(now); yd.setDate(now.getDate()-1); const iy=d.toDateString()===yd.toDateString(); const tm=d.toTimeString().slice(0,5); if(sd) return 'Heute '+tm; if(iy) return 'Gestern '+tm; return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+tm; }
 function dayKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); }
 function computeStreak(h){ if(!h.length) return 0; const days=new Set(h.map(r=>dayKey(r.ts))); let s=0; const d=new Date(); if(!days.has(dayKey(d.getTime()))){ d.setDate(d.getDate()-1); if(!days.has(dayKey(d.getTime()))) return 0; } while(days.has(dayKey(d.getTime()))){ s++; d.setDate(d.getDate()-1); } return s; }
 function trendPct(vals){ if(vals.length<4) return null; const mid=Math.floor(vals.length/2), o=vals.slice(0,mid), n=vals.slice(mid); const a=o.reduce((x,y)=>x+y,0)/o.length, b=n.reduce((x,y)=>x+y,0)/n.length; if(!a) return null; return Math.round((b-a)/a*100); }
 function trendbadge(p){ if(p==null) return ''; if(p>2) return `<span class="arrow-up">▲ +${p}%</span>`; if(p<-2) return `<span class="arrow-dn">▼ ${p}%</span>`; return `<span style="color:var(--dim)">≈ stabil</span>`; }
 
-const TRENDS=[ {k:'success',n:'Übungserfolg',src:'hrv',fmt:v=>v+'%'}, {k:'coh',n:'Kohärenz',src:'hrv'}, {k:'rmssd',n:'RMSSD (Ruhe)',src:'scan'}, {k:'sdnn',n:'SDNN (Ruhe)',src:'scan'}, {k:'rmssd',n:'RMSSD (Training)',src:'hrv',id:'rmssd_tr'}, {k:'lfhf',n:'LF/HF (Ruhe)',src:'scan'} ];
+const TRENDS=[ {k:'rmssd',n:'HRV Nacht (Garmin)',src:'garmin'}, {k:'success',n:'Übungserfolg',src:'hrv',fmt:v=>v+'%'}, {k:'coh',n:'Kohärenz',src:'hrv'}, {k:'rmssd',n:'RMSSD (Ruhe)',src:'scan'}, {k:'sdnn',n:'SDNN (Ruhe)',src:'scan'}, {k:'rmssd',n:'RMSSD (Training)',src:'hrv',id:'rmssd_tr'}, {k:'lfhf',n:'LF/HF (Ruhe)',src:'scan'} ];
 let curTrend=0;
 function renderHistory(){
   const h=loadHist();
-  const totalMin=Math.round(h.reduce((s,r)=>s+(r.dur||0),0)/60);
+  const active=h.filter(r=>ACTIVE_MODES.includes(r.mode));
   const scans=h.filter(r=>r.mode==='scan'&&r.rmssd!=null);
-  const last5=scans.slice(-5); const avgR=last5.length?Math.round(last5.reduce((s,r)=>s+r.rmssd,0)/last5.length):null;
-  $('#hcSessions').textContent=h.length; $('#hcMinutes').textContent=totalMin; $('#hcStreak').textContent=computeStreak(h); $('#hcRmssd').textContent=avgR!=null?avgR:'–';
-  $('#histInterpret').innerHTML=buildInterpretation(h,scans);
+  const garmins=h.filter(r=>r.mode==='garmin'&&r.rmssd!=null);
+  const totalMin=Math.round(active.reduce((s,r)=>s+(r.dur||0),0)/60);
+  $('#hcSessions').textContent=active.length; $('#hcMinutes').textContent=totalMin; $('#hcStreak').textContent=computeStreak(active);
+  if(garmins.length){ const g=garmins[garmins.length-1]; $('#hcRmssd').textContent=(g.g7!=null?g.g7:Math.round(g.rmssd)); $('#hcRmssdLbl').textContent='Garmin 7-Tage HRV'; }
+  else { const last5=scans.slice(-5); const avgR=last5.length?Math.round(last5.reduce((s,r)=>s+r.rmssd,0)/last5.length):null; $('#hcRmssd').textContent=avgR!=null?avgR:'–'; $('#hcRmssdLbl').textContent='Ø RMSSD Ruhe (5)'; }
+  $('#histInterpret').innerHTML=buildInterpretation(h,scans,garmins);
   // trend selector
   $('#trendSeg').innerHTML=TRENDS.map((t,i)=>`<button class="${i===curTrend?'on':''}" data-i="${i}">${t.n}</button>`).join('');
   document.querySelectorAll('#trendSeg button').forEach(b=>b.addEventListener('click',()=>{ curTrend=+b.dataset.i; renderTrend(h); document.querySelectorAll('#trendSeg button').forEach(x=>x.classList.toggle('on',x===b)); }));
@@ -881,9 +887,10 @@ function renderHistory(){
   list.innerHTML = h.slice().reverse().slice(0,80).map((r,i)=>{ const idx=h.length-1-i; const m=MODE_META[r.mode]||{i:'•',n:r.mode}; let met='';
     if(r.mode==='hrv') met=`<b>${r.success!=null?r.success+'%':'–'}</b> Erfolg${r.coh!=null?` · Koh ${r.coh}`:''}`;
     else if(r.mode==='scan') met=`<b>${r.rmssd!=null?Math.round(r.rmssd):'–'}</b> RMSSD${r.meanHR?` · ${Math.round(r.meanHR)}bpm`:''}`;
+    else if(r.mode==='garmin') met=`<b>${Math.round(r.rmssd)}</b> ms Nacht${r.g7!=null?` · Ø7 ${r.g7}`:''}`;
     else if(r.mode==='sigh') met=`<b>${r.cycles}</b> Seufzer`; else met=`<b>${r.breaths||0}</b> Atemzüge`;
     const clickable=(r.mode==='hrv'||r.mode==='scan');
-    return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${m.n} · ${fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div>${clickable?'<div class="chev">›</div>':''}</div>`;
+    return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${m.n}${r.mode==='garmin'?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div>${clickable?'<div class="chev">›</div>':''}</div>`;
   }).join('');
   document.querySelectorAll('#histList .h-row[data-idx]').forEach(el=>el.addEventListener('click',()=>{ const r=loadHist()[+el.dataset.idx]; if(r) openResult(r); }));
   $('#glossaryBody').innerHTML=GLOSSARY;
@@ -893,22 +900,26 @@ function renderTrend(h){
   const vals=rows.map(r=>r[t.k]);
   $('#sparkTitle').textContent=t.n;
   $('#sparkMeta').innerHTML = vals.length? (trendPct(vals)!=null?trendbadge(trendPct(vals)):`${vals.length} Messung(en)`) : 'keine Daten';
-  drawSpark('#sparkMain', vals, t.src==='scan'?'#5fb0ff':'#7ee0c9');
+  drawSpark('#sparkMain', vals, t.src==='scan'?'#5fb0ff':(t.src==='garmin'?'#a9b8ff':'#7ee0c9'));
 }
-function buildInterpretation(h,scans){
-  if(!h.length) return 'Sobald du übst, deute ich hier deinen Trend — HRV-Entwicklung, Kohärenz und Serie. Für Baseline-HRV die Ruhemessung nutzen, für Kohärenz-Training das Training.';
-  const streak=computeStreak(h); let p=[];
-  if(streak>=3) p.push(`Starke Serie: <b>${streak} Tage</b> in Folge — genau die Regelmäßigkeit, die HRV über Wochen anhebt.`);
-  else if(streak>=1) p.push(`Du bist dran (<b>${streak}-Tage-Serie</b>). Konstanz schlägt Einzel-Länge.`);
-  else p.push(`Länger keine Sitzung. Schon 5 Minuten heute setzen die Serie neu.`);
-  if(scans.length>=4){ const rt=trendPct(scans.map(r=>r.rmssd));
-    if(rt>5) p.push(`Deine <b>Ruhe-RMSSD steigt</b> <span class="arrow-up">+${rt}%</span> — dein Grund-Erholungszustand verbessert sich.`);
-    else if(rt<-5) p.push(`Ruhe-RMSSD zuletzt <span class="arrow-dn">${rt}%</span> — tagesformabhängig, auf den Wochen-Trend schauen.`);
-    else p.push(`Deine Ruhe-RMSSD ist <b>stabil</b>.`); }
-  else if(scans.length>=1) p.push(`Erst ${scans.length} Ruhemessung(en) — ab ~4 zeige ich einen belastbaren Baseline-Trend.`);
-  else p.push(`Noch keine Ruhemessung: In „HRV Live → Ruhemessung" bekommst du deine Baseline-HRV vs. Altersnorm.`);
+function buildInterpretation(h,scans,garmins){
+  garmins=garmins||[];
+  const active=h.filter(r=>ACTIVE_MODES.includes(r.mode));
+  if(!active.length && !garmins.length) return 'Sobald du übst oder deine Garmin-Nacht-HRV importierst, deute ich hier deinen Trend — HRV-Entwicklung, Kohärenz und Übungsserie.';
+  let p=[];
+  if(garmins.length>=4){ const gt=trendPct(garmins.map(r=>r.rmssd)); const g=garmins[garmins.length-1]; const rng=(g.baseLo&&g.baseHi)?` (deine Garmin-Baseline ${g.baseLo}–${g.baseHi} ms)`:'';
+    if(gt>5) p.push(`Deine <b>nächtliche HRV (Garmin) steigt</b> <span class="arrow-up">+${gt}%</span>${rng} — dein Grund-Erholungszustand verbessert sich.`);
+    else if(gt<-5) p.push(`Deine nächtliche HRV (Garmin) liegt zuletzt <span class="arrow-dn">${gt}%</span> niedriger${rng} — auf Schlaf, Stress, Alkohol achten; der Wochen-Trend zählt.`);
+    else p.push(`Deine nächtliche HRV (Garmin) ist <b>stabil</b>${rng}.`); }
+  else if(garmins.length>=1){ const g=garmins[garmins.length-1]; p.push(`Garmin-Nacht-HRV zuletzt <b>${Math.round(g.rmssd)} ms</b>${g.g7!=null?` (7-Tage-Ø ${g.g7})`:''}. Ab ~4 Tagen zeige ich den Trend.`); }
+  const streak=computeStreak(active);
+  if(streak>=3) p.push(`Starke Serie: <b>${streak} Tage</b> aktiv geübt — Regelmäßigkeit hebt die HRV über Wochen.`);
+  else if(streak>=1) p.push(`Du bist dran (<b>${streak}-Tage-Übungsserie</b>). Konstanz schlägt Einzel-Länge.`);
+  else if(active.length) p.push(`Länger nicht aktiv geübt — 5 Min heute setzen die Serie neu.`);
+  else p.push(`Noch keine aktive Übung — starte z. B. eine Resonanz-Sitzung (zahlt direkt auf die HRV ein).`);
+  if(scans.length>=4){ const rt=trendPct(scans.map(r=>r.rmssd)); if(rt>5) p.push(`Ruhe-RMSSD (Polar) steigt <span class="arrow-up">+${rt}%</span>.`); else if(rt<-5) p.push(`Ruhe-RMSSD (Polar) zuletzt <span class="arrow-dn">${rt}%</span>.`); }
   const hrv=h.filter(r=>r.mode==='hrv'&&r.success!=null);
-  if(hrv.length>=4){ const st=trendPct(hrv.map(r=>r.success)); if(st>5) p.push(`Auch dein <b>Übungserfolg wächst</b> <span class="arrow-up">+${st}%</span> — du triffst deine Resonanz besser.`); }
+  if(hrv.length>=4){ const st=trendPct(hrv.map(r=>r.success)); if(st>5) p.push(`Übungserfolg wächst <span class="arrow-up">+${st}%</span> — du triffst deine Resonanz besser.`); }
   return p.join(' ');
 }
 function drawSpark(sel,vals,color){
@@ -927,6 +938,38 @@ $('#exportBtn').addEventListener('click',()=>{ const data={app:'atem',version:3,
 $('#importBtn').addEventListener('click',()=>$('#importFile').click());
 $('#importFile').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const d=JSON.parse(rd.result); if(!d||!Array.isArray(d.history)) throw 0; const cur=loadHist(), seen=new Set(cur.map(r=>r.ts)); let add=0; d.history.forEach(r=>{ if(r&&r.ts&&!seen.has(r.ts)){ cur.push(r); seen.add(r.ts); add++; } }); cur.sort((a,b)=>a.ts-b.ts); saveHist(cur); if(d.settings){ Object.assign(state.settings,d.settings); save(); syncControls(); syncHint(); } renderHistory(); toast(`Import ok: ${add} neue Sitzung(en).`); }catch(err){ toast('Datei nicht lesbar.'); } }; rd.readAsText(f); e.target.value=''; });
 $('#clearBtn').addEventListener('click',()=>{ if(confirm('Gesamten Verlauf löschen? Vorher am besten exportieren.')){ saveHist([]); renderHistory(); toast('Verlauf gelöscht.'); } });
+
+/* Garmin HRV-Status CSV Import (Spalten: Datum, HFV über Nacht, Ausgangszustand, 7-Tage-Durchschnitt) */
+const GARMIN_MON={jan:1,feb:2,'mär':3,mar:3,mrz:3,apr:4,mai:5,may:5,jun:6,jul:7,aug:8,sep:9,okt:10,oct:10,nov:11,dez:12,dec:12};
+function num(s){ const m=(s||'').match(/-?\d+(?:[.,]\d+)?/); return m?parseFloat(m[0].replace(',','.')):null; }
+function parseGarminCsv(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean); if(!lines.length) return [];
+  let start = /datum|hfv|hrv|über nacht|overnight/i.test(lines[0]) ? 1 : 0;
+  const rows=[];
+  for(let i=start;i<lines.length;i++){ const c=lines[i].split(/[;,]/).map(s=>s.trim()); if(c.length<2) continue;
+    const dm=c[0].match(/([A-Za-zäöüÄÖÜ]{3,})\.?\s+(\d{1,2})/); if(!dm) continue;
+    const mon=GARMIN_MON[dm[1].toLowerCase().slice(0,3)]; const day=+dm[2]; const rmssd=num(c[1]);
+    if(!mon||!day||rmssd==null) continue;
+    const rng=(c[2]||'').match(/(\d+)\D+(\d+)/);
+    rows.push({month:mon, day, rmssd, g7:num(c[3]), lo:rng?+rng[1]:null, hi:rng?+rng[2]:null});
+  }
+  if(!rows.length) return [];
+  // Jahr rückwärts zuweisen (Daten ohne Jahr, aufsteigend chronologisch)
+  const now=new Date(); let year=now.getFullYear();
+  const last=rows[rows.length-1]; if(new Date(year,last.month-1,last.day) > now) year--;
+  for(let i=rows.length-1;i>=0;i--){ if(i<rows.length-1 && rows[i].month>rows[i+1].month) year--; rows[i].year=year; }
+  return rows.map(r=>({ ts:new Date(r.year,r.month-1,r.day,7,0,0).getTime(), mode:'garmin', src:'garmin',
+    rmssd:r.rmssd, g7:r.g7, baseLo:r.lo, baseHi:r.hi, dur:0 }));
+}
+$('#garminBtn').addEventListener('click',()=>$('#garminFile').click());
+$('#garminFile').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ try{ const entries=parseGarminCsv(rd.result); if(!entries.length){ toast('Keine Garmin-Daten erkannt.'); return; }
+    const cur=loadHist(), seen=new Set(cur.map(r=>r.ts+'_'+r.mode)); let add=0, upd=0;
+    entries.forEach(en=>{ const key=en.ts+'_garmin'; const ex=cur.find(r=>r.mode==='garmin'&&r.ts===en.ts);
+      if(ex){ Object.assign(ex,en); upd++; } else if(!seen.has(key)){ cur.push(en); seen.add(key); add++; } });
+    cur.sort((a,b)=>a.ts-b.ts); saveHist(cur); renderHistory(); toast(`Garmin: ${add} neu, ${upd} aktualisiert.`);
+  }catch(err){ toast('CSV nicht lesbar.'); } };
+  rd.readAsText(f); e.target.value=''; });
 
 const GLOSSARY = `
 <p><b>Puls (bpm)</b> — Herzschläge/Min. Sinkt beim langsamen Ausatmen (gewollt).</p>
