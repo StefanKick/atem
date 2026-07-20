@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<title>Atem</title>
+<style>
+  :root{
+    --bg1:#0b1220; --bg2:#102a45; --card:#16233a; --line:#243a57;
+    --txt:#e6eefb; --dim:#8aa0c0; --teal:#4fd1c5; --teal-dim:#2c8a82;
+    --inhale:#5fb0ff; --exhale:#7ee0c9; --warn:#ffb24d; --bad:#ff6b6b;
+    --shadow:0 10px 40px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; margin:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+    color:var(--txt);
+    background:radial-gradient(140% 100% at 50% -10%, #16345a 0%, var(--bg1) 55%, #070c15 100%);
+    display:flex; flex-direction:column; min-height:100dvh;
+    overflow:hidden; overscroll-behavior:none;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select:none; -webkit-user-select:none;
+  }
+  header{padding:14px 18px 6px; text-align:center;}
+  header h1{font-size:15px; font-weight:600; letter-spacing:3px; margin:0; color:var(--dim); text-transform:uppercase;}
+  /* Tabs */
+  .tabs{display:flex; gap:6px; padding:10px 14px 4px; justify-content:center;}
+  .tab{
+    flex:1; max-width:150px; padding:9px 6px; border-radius:12px; text-align:center;
+    background:transparent; color:var(--dim); font-size:12.5px; font-weight:600;
+    border:1px solid transparent; cursor:pointer; transition:.2s;
+  }
+  .tab.active{background:var(--card); color:var(--txt); border-color:var(--line); box-shadow:var(--shadow);}
+  /* Stage */
+  main{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; padding:8px 18px;}
+  .phase{font-size:22px; font-weight:600; letter-spacing:1px; height:30px; color:var(--txt); opacity:.95; transition:.3s;}
+  .orb-wrap{position:relative; width:min(74vw,320px); aspect-ratio:1; display:flex; align-items:center; justify-content:center; margin:8px 0;}
+  .ring{position:absolute; inset:0; border-radius:50%;}
+  .orb{
+    position:absolute; width:100%; height:100%; border-radius:50%;
+    background:radial-gradient(circle at 50% 38%, rgba(127,224,201,.35), rgba(95,176,255,.14) 55%, transparent 72%);
+    box-shadow:0 0 60px rgba(95,176,255,.25), inset 0 0 40px rgba(127,224,201,.15);
+    transform:scale(.42);
+    display:flex; align-items:center; justify-content:center;
+    will-change:transform;
+  }
+  .orb.no-anim{transition:none;}
+  .orb .count{font-size:52px; font-weight:200; color:var(--txt); font-variant-numeric:tabular-nums;}
+  .orb-core{
+    position:absolute; width:46%; height:46%; border-radius:50%;
+    border:2px solid rgba(127,224,201,.5);
+    background:radial-gradient(circle at 50% 40%, rgba(127,224,201,.28), rgba(95,176,255,.10));
+    transform:scale(.5); will-change:transform;
+  }
+  .sub{height:22px; font-size:13px; color:var(--dim); margin-top:2px; text-align:center;}
+  /* Stats row */
+  .stats{display:flex; gap:22px; justify-content:center; margin-top:6px; flex-wrap:wrap;}
+  .stat{text-align:center; min-width:70px;}
+  .stat .v{font-size:22px; font-weight:600; font-variant-numeric:tabular-nums;}
+  .stat .l{font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-top:2px;}
+  /* Controls */
+  .controls{padding:10px 18px calc(14px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:10px; align-items:center;}
+  .btn{
+    border:none; border-radius:16px; padding:16px 20px; font-size:16px; font-weight:600;
+    width:100%; max-width:420px; cursor:pointer; transition:.15s; color:#04141a;
+    background:linear-gradient(180deg,#7ee0c9,#4fd1c5); box-shadow:var(--shadow);
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn.stop{background:linear-gradient(180deg,#3a4a63,#2a374d); color:var(--txt);}
+  .btn.ghost{background:transparent; border:1px solid var(--line); color:var(--dim); box-shadow:none; padding:12px;}
+  .row{display:flex; gap:10px; width:100%; max-width:420px;}
+  .row .btn{flex:1;}
+  /* Settings sheet */
+  .gear{position:absolute; top:14px; right:16px; background:none; border:none; color:var(--dim); font-size:22px; cursor:pointer; z-index:5;}
+  .sheet-bg{position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; pointer-events:none; transition:.25s; z-index:20;}
+  .sheet-bg.open{opacity:1; pointer-events:auto;}
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:21;
+    background:var(--card); border-radius:22px 22px 0 0; border-top:1px solid var(--line);
+    padding:18px 20px calc(24px + env(safe-area-inset-bottom));
+    transform:translateY(110%); transition:.28s cubic-bezier(.4,0,.2,1); box-shadow:var(--shadow);
+    max-height:82dvh; overflow-y:auto;
+  }
+  .sheet.open{transform:translateY(0);}
+  .sheet h2{font-size:15px; margin:0 0 14px; letter-spacing:1px; color:var(--dim); text-transform:uppercase;}
+  .field{margin-bottom:20px;}
+  .field label{display:flex; justify-content:space-between; font-size:14px; margin-bottom:8px;}
+  .field label b{color:var(--teal); font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%; accent-color:var(--teal); height:26px;}
+  .toggle{display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid var(--line); font-size:14px;}
+  .switch{position:relative; width:50px; height:28px; background:#33455f; border-radius:20px; transition:.2s; cursor:pointer; flex:none;}
+  .switch.on{background:var(--teal-dim);}
+  .switch::after{content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:.2s;}
+  .switch.on::after{left:25px;}
+  .presets{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;}
+  .chip{padding:8px 12px; border-radius:20px; background:#1d2c44; border:1px solid var(--line); color:var(--dim); font-size:12.5px; cursor:pointer;}
+  .chip.active{background:var(--teal-dim); color:#fff; border-color:var(--teal);}
+  .hint{font-size:12px; color:var(--dim); line-height:1.5; margin-top:4px;}
+  /* HRV */
+  #hrvPanel{width:100%; max-width:440px; display:flex; flex-direction:column; align-items:center; gap:10px;}
+  #hrvGraph{width:100%; height:120px; background:#0c1626; border:1px solid var(--line); border-radius:14px;}
+  .coh-wrap{width:100%;}
+  .coh-bar{height:14px; background:#0c1626; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .coh-fill{height:100%; width:0%; background:linear-gradient(90deg,#5fb0ff,#7ee0c9,#4fd1c5); transition:width .4s;}
+  .coh-lbl{display:flex; justify-content:space-between; font-size:11px; color:var(--dim); margin-top:4px;}
+  .badge{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); padding:5px 10px; border:1px solid var(--line); border-radius:20px;}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--bad);}
+  .dot.on{background:var(--teal); box-shadow:0 0 8px var(--teal);}
+  .hide{display:none !important;}
+  .toast{position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:#1d2c44; border:1px solid var(--line); color:var(--txt); padding:12px 18px; border-radius:12px; font-size:13px; z-index:40; opacity:0; transition:.3s; max-width:88vw; text-align:center;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="modeTitle">Resonanz-Atmung</h1>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-mode="resonance">Resonanz</div>
+  <div class="tab" data-mode="sigh">Seufzer</div>
+  <div class="tab" data-mode="hrv">HRV&nbsp;Live</div>
+</div>
+
+<main>
+  <button class="gear" id="gearBtn" aria-label="Einstellungen">⚙︎</button>
+
+  <div class="phase" id="phaseLabel">Bereit</div>
+
+  <div class="orb-wrap">
+    <div class="orb no-anim" id="orb">
+      <div class="orb-core" id="orbCore"></div>
+      <div class="count" id="countNum"></div>
+    </div>
+  </div>
+
+  <div class="sub" id="subLabel">4 Sek ein · 6 Sek aus — 6 Atemzüge/Min</div>
+
+  <!-- Resonance/Sigh stats -->
+  <div class="stats" id="statsRow">
+    <div class="stat"><div class="v" id="statTime">5:00</div><div class="l">Restzeit</div></div>
+    <div class="stat"><div class="v" id="statBreaths">0</div><div class="l">Atemzüge</div></div>
+  </div>
+
+  <!-- HRV panel -->
+  <div id="hrvPanel" class="hide">
+    <div class="badge"><span class="dot" id="bleDot"></span><span id="bleStatus">Polar nicht verbunden</span></div>
+    <canvas id="hrvGraph"></canvas>
+    <div class="stats">
+      <div class="stat"><div class="v" id="hrVal">–</div><div class="l">Puls (bpm)</div></div>
+      <div class="stat"><div class="v" id="rmssdVal">–</div><div class="l">HRV (RMSSD)</div></div>
+      <div class="stat"><div class="v" id="rsaVal">–</div><div class="l">RSA-Schwung</div></div>
+    </div>
+    <div class="coh-wrap">
+      <div class="coh-bar"><div class="coh-fill" id="cohFill"></div></div>
+      <div class="coh-lbl"><span>Kohärenz — folge dem Atem-Kreis</span><span id="cohPct">0%</span></div>
+    </div>
+  </div>
+</main>
+
+<div class="controls">
+  <button class="btn" id="startBtn">Start</button>
+  <div class="row hide" id="hrvRow">
+    <button class="btn ghost" id="connectBtn">Polar verbinden</button>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet">
+  <h2 id="sheetTitle">Einstellungen</h2>
+
+  <div id="resSettings">
+    <div class="presets">
+      <span class="chip" data-in="4" data-out="6">4–6 (Standard)</span>
+      <span class="chip" data-in="4" data-out="4">4–4</span>
+      <span class="chip" data-in="5" data-out="5">5–5</span>
+      <span class="chip" data-in="6" data-out="6">6–6</span>
+      <span class="chip" data-in="4" data-out="8">4–8</span>
+    </div>
+    <div class="field">
+      <label>Einatmen <b><span id="inVal">4</span> s</b></label>
+      <input type="range" id="inRange" min="2" max="8" step="0.5" value="4">
+    </div>
+    <div class="field">
+      <label>Halten (nach Einatmen) <b><span id="h1Val">0</span> s</b></label>
+      <input type="range" id="h1Range" min="0" max="8" step="0.5" value="0">
+    </div>
+    <div class="field">
+      <label>Ausatmen <b><span id="outVal">6</span> s</b></label>
+      <input type="range" id="outRange" min="2" max="12" step="0.5" value="6">
+    </div>
+    <div class="field">
+      <label>Halten (nach Ausatmen) <b><span id="h2Val">0</span> s</b></label>
+      <input type="range" id="h2Range" min="0" max="8" step="0.5" value="0">
+    </div>
+    <div class="field">
+      <label>Dauer <b><span id="durVal">5</span> Min</b></label>
+      <input type="range" id="durRange" min="1" max="20" step="1" value="5">
+    </div>
+    <p class="hint" id="rateHint"></p>
+  </div>
+
+  <div id="sighSettings" class="hide">
+    <div class="field">
+      <label>Anzahl Seufzer <b><span id="sighVal">4</span></b></label>
+      <input type="range" id="sighRange" min="1" max="10" step="1" value="4">
+    </div>
+    <p class="hint">Ablauf pro Zyklus: tief durch die Nase einatmen → kurz nachziehen → lang durch den Mund ausatmen. Bei ersten Anzeichen von Seitenstechen 3–4×.</p>
+  </div>
+
+  <div class="toggle"><span>Ton (Gleitklang)</span><div class="switch on" id="swSound"></div></div>
+  <div class="toggle"><span>Vibration</span><div class="switch on" id="swVibe"></div></div>
+  <div class="toggle"><span>Bildschirm anlassen</span><div class="switch on" id="swWake"></div></div>
+
+  <button class="btn ghost" id="closeSheet" style="margin-top:16px;">Fertig</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Atem — Resonanz · Physiological Sigh · HRV-Biofeedback (Polar)
+   Single-file. Offline. Android Chrome + Web Bluetooth.
+   ============================================================ */
+const $ = s => document.querySelector(s);
+
+const state = {
+  mode:'resonance',
+  running:false,
+  settings:{ in:4, h1:0, out:6, h2:0, durMin:5, sighCount:4, sound:true, vibe:true, wake:true },
+};
+
+/* ---------- Audio (Web Audio, gentle glide tones) ---------- */
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function glide(from,to,dur,vol=0.16){
+  if(!state.settings.sound || !audioCtx) return;
+  const t=audioCtx.currentTime;
+  const osc=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  osc.type='sine';
+  osc.frequency.setValueAtTime(from,t);
+  osc.frequency.linearRampToValueAtTime(to, t+dur);
+  const atk=Math.min(0.35,dur*0.3), rel=Math.min(0.4,dur*0.35);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol, t+atk);
+  g.gain.setValueAtTime(vol, t+Math.max(atk,dur-rel));
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t); osc.stop(t+dur+0.05);
+}
+function chime(freq=520,dur=0.5,vol=0.2){
+  if(!state.settings.sound || !audioCtx) return;
+  const t=audioCtx.currentTime;
+  const osc=audioCtx.createOscillator(); const g=audioCtx.createGain();
+  osc.type='sine'; osc.frequency.value=freq;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t); osc.stop(t+dur+0.05);
+}
+function vibrate(p){ if(state.settings.vibe && navigator.vibrate) navigator.vibrate(p); }
+
+/* ---------- Wake Lock ---------- */
+let wakeLock=null;
+async function reqWake(){
+  if(!state.settings.wake) return;
+  try{ if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function relWake(){ try{ wakeLock && wakeLock.release(); }catch(e){} wakeLock=null; }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && state.running) reqWake(); });
+
+/* ---------- Orb control ---------- */
+const orb=$('#orb'), orbCore=$('#orbCore'), countNum=$('#countNum'),
+      phaseLabel=$('#phaseLabel'), subLabel=$('#subLabel');
+function setScale(el,s,secs){
+  el.classList.remove('no-anim');
+  el.style.transition = secs>0 ? `transform ${secs}s cubic-bezier(.37,0,.63,1)` : 'none';
+  el.style.transform = `scale(${s})`;
+}
+function resetOrb(){
+  orb.classList.add('no-anim'); orbCore.classList.add('no-anim');
+  orb.style.transform='scale(.42)'; orbCore.style.transform='scale(.5)';
+  countNum.textContent=''; phaseLabel.textContent='Bereit';
+}
+
+/* ---------- Breathing engine (state machine) ---------- */
+let engine=null;
+function stopEngine(){
+  if(engine){ clearTimeout(engine.timer); cancelAnimationFrame(engine.raf); engine=null; }
+}
+function startResonance(){
+  const s=state.settings;
+  const seq=[];
+  seq.push({name:'Einatmen', dur:s.in,  scale:1.0, glide:[196,392], vibe:90});
+  if(s.h1>0) seq.push({name:'Halten', dur:s.h1, scale:1.0, glide:null, vibe:30});
+  seq.push({name:'Ausatmen', dur:s.out, scale:.42, glide:[392,196], vibe:[0,60]});
+  if(s.h2>0) seq.push({name:'Halten', dur:s.h2, scale:.42, glide:null, vibe:30});
+
+  const totalMs=s.durMin*60*1000;
+  const t0=performance.now();
+  let idx=0, breaths=0, phaseStart=performance.now();
+  engine={timer:null,raf:null};
+
+  function enter(i){
+    const ph=seq[i]; phaseStart=performance.now();
+    phaseLabel.textContent=ph.name;
+    setScale(orb, ph.scale, ph.dur);
+    setScale(orbCore, ph.scale===1.0?1.0:.5, ph.dur);
+    if(ph.glide) glide(ph.glide[0],ph.glide[1],ph.dur);
+    if(ph.vibe) vibrate(ph.vibe);
+    if(ph.name==='Einatmen'){ breaths++; $('#statBreaths').textContent=breaths; }
+    engine.timer=setTimeout(()=>{ idx=(idx+1)%seq.length; enter(idx); }, ph.dur*1000);
+  }
+  function tick(){
+    const now=performance.now();
+    const remain=Math.max(0, totalMs-(now-t0));
+    $('#statTime').textContent=fmt(remain);
+    const ph=seq[idx];
+    const inPhase=(now-phaseStart)/1000;
+    const left=Math.max(0, Math.ceil(ph.dur-inPhase));
+    countNum.textContent=left;
+    if(remain<=0){ finishSession(breaths); return; }
+    engine.raf=requestAnimationFrame(tick);
+  }
+  enter(0); tick();
+}
+
+function startSigh(){
+  const n=state.settings.sighCount;
+  let cycle=0;
+  engine={timer:null,raf:null};
+  $('#statTime').textContent=n; $('#statBreaths').textContent=0;
+  // relabel stats for sigh
+  document.querySelectorAll('#statsRow .l')[0].textContent='Ziel';
+  document.querySelectorAll('#statsRow .l')[1].textContent='Erledigt';
+
+  const steps=[
+    {name:'Einatmen', sub:'tief durch die Nase', dur:1.6, scale:.85, glide:[196,340], vibe:70},
+    {name:'Nachziehen', sub:'noch ein kleiner Zug', dur:1.0, scale:1.0, glide:[340,440], vibe:40},
+    {name:'Ausatmen', sub:'lang durch den Mund', dur:6.0, scale:.42, glide:[440,180], vibe:[0,70]},
+    {name:'Pause', sub:'kurz ruhen', dur:1.4, scale:.42, glide:null, vibe:20},
+  ];
+  let i=0;
+  function enter(k){
+    const st=steps[k]; phaseLabel.textContent=st.name; subLabel.textContent=st.sub;
+    countNum.textContent='';
+    setScale(orb, st.scale, st.dur);
+    setScale(orbCore, st.scale===1.0?1.0:.5, st.dur);
+    if(st.glide) glide(st.glide[0],st.glide[1],st.dur);
+    if(st.vibe) vibrate(st.vibe);
+    engine.timer=setTimeout(()=>{
+      let nx=k+1;
+      if(nx>=steps.length){
+        cycle++; $('#statBreaths').textContent=cycle;
+        if(cycle>=n){ finishSession(cycle,true); return; }
+        nx=0;
+      }
+      i=nx; enter(nx);
+    }, st.dur*1000);
+  }
+  enter(0);
+}
+
+function finishSession(count,isSigh){
+  stopEngine();
+  chime(660,0.6); setTimeout(()=>chime(880,0.7),180);
+  vibrate([120,80,120]);
+  phaseLabel.textContent='Fertig ✓';
+  subLabel.textContent = isSigh ? `${count} Seufzer erledigt` : `${count} Atemzüge · gut gemacht`;
+  countNum.textContent='';
+  setScale(orb,.42,2); setScale(orbCore,.5,2);
+  setRunning(false);
+}
+
+function fmt(ms){ const s=Math.round(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+/* ---------- Start/Stop ---------- */
+function setRunning(on){
+  state.running=on;
+  const b=$('#startBtn');
+  if(state.mode==='hrv'){ b.classList.add('hide'); return; } else b.classList.remove('hide');
+  b.textContent=on?'Stopp':'Start';
+  b.classList.toggle('stop',on);
+}
+$('#startBtn').addEventListener('click',()=>{
+  ensureAudio();
+  if(state.running){ stopEngine(); relWake(); resetOrb(); subLabel.textContent=subText(); setRunning(false); return; }
+  resetOrb(); reqWake(); setRunning(true);
+  if(state.mode==='resonance'){ resetStatsLabels(); $('#statBreaths').textContent=0; startResonance(); }
+  else if(state.mode==='sigh'){ startSigh(); }
+});
+
+function resetStatsLabels(){
+  document.querySelectorAll('#statsRow .l')[0].textContent='Restzeit';
+  document.querySelectorAll('#statsRow .l')[1].textContent='Atemzüge';
+  const s=state.settings; $('#statTime').textContent=fmt(s.durMin*60*1000);
+}
+
+/* ---------- Tabs / modes ---------- */
+function subText(){
+  const s=state.settings;
+  if(state.mode==='resonance'){
+    const bpm=(60/(s.in+s.h1+s.out+s.h2)).toFixed(1);
+    return `${s.in} Sek ein · ${s.out} Sek aus — ${bpm} Atemzüge/Min`;
+  }
+  if(state.mode==='sigh') return 'Doppel-Einatmung, langer Ausatem — 3–4× bei Seitenstechen';
+  return 'Atme mit dem Kreis, halte den Polar-Gurt an';
+}
+function switchMode(m){
+  if(state.running){ stopEngine(); relWake(); }
+  state.mode=m; state.running=false;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===m));
+  const titles={resonance:'Resonanz-Atmung',sigh:'Physiological Sigh',hrv:'HRV Live-Biofeedback'};
+  $('#modeTitle').textContent=titles[m];
+  $('#hrvPanel').classList.toggle('hide',m!=='hrv');
+  $('#statsRow').classList.toggle('hide',m==='hrv');
+  $('#hrvRow').classList.toggle('hide',m!=='hrv');
+  $('#gearBtn').classList.toggle('hide',m==='hrv');
+  $('.orb-wrap').style.display = 'flex';
+  resetOrb(); resetStatsLabels();
+  phaseLabel.textContent = m==='hrv' ? 'Atme im Kreis mit' : 'Bereit';
+  subLabel.textContent=subText();
+  setRunning(false);
+  $('#startBtn').textContent='Start';
+  // settings sheet content
+  $('#resSettings').classList.toggle('hide',m!=='resonance');
+  $('#sighSettings').classList.toggle('hide',m!=='sigh');
+  if(m==='hrv'){ startHrvPacer(); } else { stopHrvPacer(); }
+}
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchMode(t.dataset.mode)));
+
+/* ---------- Settings sheet ---------- */
+const sheet=$('#sheet'), sheetBg=$('#sheetBg');
+function openSheet(){ sheet.classList.add('open'); sheetBg.classList.add('open'); }
+function closeSheet(){ sheet.classList.remove('open'); sheetBg.classList.remove('open'); save(); }
+$('#gearBtn').addEventListener('click',openSheet);
+$('#closeSheet').addEventListener('click',closeSheet);
+sheetBg.addEventListener('click',closeSheet);
+
+function bindRange(id,key,out,after){
+  const r=$(id);
+  r.addEventListener('input',()=>{ state.settings[key]=parseFloat(r.value); $(out).textContent=r.value; after&&after(); });
+}
+bindRange('#inRange','in','#inVal',syncHint);
+bindRange('#h1Range','h1','#h1Val',syncHint);
+bindRange('#outRange','out','#outVal',syncHint);
+bindRange('#h2Range','h2','#h2Val',syncHint);
+bindRange('#durRange','durMin','#durVal',()=>{ if(!state.running) resetStatsLabels(); });
+$('#sighRange').addEventListener('input',e=>{ state.settings.sighCount=+e.target.value; $('#sighVal').textContent=e.target.value; });
+
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+  state.settings.in=+c.dataset.in; state.settings.out=+c.dataset.out; state.settings.h1=0; state.settings.h2=0;
+  syncControls(); syncHint();
+}));
+function syncControls(){
+  const s=state.settings;
+  $('#inRange').value=s.in; $('#inVal').textContent=s.in;
+  $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1;
+  $('#outRange').value=s.out; $('#outVal').textContent=s.out;
+  $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2;
+  $('#durRange').value=s.durMin; $('#durVal').textContent=s.durMin;
+  $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', +c.dataset.in===s.in && +c.dataset.out===s.out && s.h1===0 && s.h2===0));
+  subLabel.textContent=subText();
+}
+function syncHint(){
+  const s=state.settings; const cyc=s.in+s.h1+s.out+s.h2; const bpm=(60/cyc).toFixed(1);
+  let msg=`≈ ${bpm} Atemzüge/Min.`;
+  if(bpm>=4.5 && bpm<=7) msg+=' 👍 Im Resonanz-Bereich — ideal für die HRV.';
+  else if(bpm>7) msg+=' Tipp: Für maximale HRV langsamer (4,5–7/Min) atmen.';
+  $('#rateHint').textContent=msg;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', +c.dataset.in===s.in && +c.dataset.out===s.out && s.h1===0 && s.h2===0));
+  if(!state.running) subLabel.textContent=subText();
+}
+function bindSwitch(id,key,cb){
+  const el=$(id);
+  el.classList.toggle('on',state.settings[key]);
+  el.addEventListener('click',()=>{ state.settings[key]=!state.settings[key]; el.classList.toggle('on',state.settings[key]); cb&&cb(); save(); });
+}
+bindSwitch('#swSound','sound');
+bindSwitch('#swVibe','vibe');
+bindSwitch('#swWake','wake',()=>{ if(!state.settings.wake) relWake(); else if(state.running) reqWake(); });
+
+/* ---------- Persistence ---------- */
+function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
+function load(){ try{ const d=JSON.parse(localStorage.getItem('atem')); if(d) Object.assign(state.settings,d); }catch(e){} }
+
+/* ============================================================
+   HRV LIVE — Web Bluetooth (Polar), RR-Intervals, RMSSD, RSA
+   ============================================================ */
+const HR_SERVICE='heart_rate';
+const HR_CHAR='heart_rate_measurement';
+let bleDevice=null, bleChar=null;
+const rr=[];            // recent RR intervals (ms)
+const hrSeries=[];      // {t, hr} for graph & RSA
+let rmssd=0, rsaAmp=0, coherence=0;
+
+$('#connectBtn').addEventListener('click', connectPolar);
+async function connectPolar(){
+  if(!navigator.bluetooth){ toast('Web Bluetooth wird nur von Chrome auf Android/Desktop unterstützt.'); return; }
+  try{
+    setBle('Suche Gerät…',false);
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters:[{services:[HR_SERVICE]}],
+      optionalServices:[HR_SERVICE]
+    });
+    bleDevice.addEventListener('gattserverdisconnected',onDisconnect);
+    const server=await bleDevice.gatt.connect();
+    const svc=await server.getPrimaryService(HR_SERVICE);
+    bleChar=await svc.getCharacteristic(HR_CHAR);
+    await bleChar.startNotifications();
+    bleChar.addEventListener('characteristicvaluechanged',onHr);
+    setBle(bleDevice.name||'Polar verbunden',true);
+    $('#connectBtn').textContent='Trennen';
+    ensureAudio();
+    toast('Verbunden. Atme mit dem Kreis — beobachte, wie dein Puls mitschwingt.');
+  }catch(e){
+    setBle('Verbindung abgebrochen',false);
+    if(e && e.name!=='NotFoundError') toast('Fehler: '+(e.message||e));
+  }
+}
+function onDisconnect(){ setBle('Getrennt',false); $('#connectBtn').textContent='Polar verbinden'; }
+$('#connectBtn').addEventListener('dblclick',()=>{ /* reserved */ });
+
+function setBle(txt,on){ $('#bleStatus').textContent=txt; $('#bleDot').classList.toggle('on',on); }
+
+function onHr(ev){
+  const v=ev.target.value;
+  const flags=v.getUint8(0);
+  const hr16=flags&0x01;
+  let idx=1, hr;
+  if(hr16){ hr=v.getUint16(idx,true); idx+=2; } else { hr=v.getUint8(idx); idx+=1; }
+  const contact=(flags>>1)&0x03;
+  const hasEnergy=(flags>>3)&0x01; if(hasEnergy) idx+=2;
+  const hasRR=(flags>>4)&0x01;
+  const now=performance.now();
+  $('#hrVal').textContent=hr||'–';
+  if(hasRR){
+    while(idx+1<v.byteLength){
+      const raw=v.getUint16(idx,true); idx+=2;
+      const ms=raw/1024*1000;             // RR in 1/1024 s → ms
+      if(ms>300 && ms<2000){ rr.push(ms); if(rr.length>120) rr.shift(); }
+    }
+    computeRmssd();
+  }
+  // instantaneous HR for RSA graph (prefer RR-derived if present)
+  const instHr = rr.length? 60000/rr[rr.length-1] : hr;
+  hrSeries.push({t:now, hr:instHr});
+  while(hrSeries.length && now-hrSeries[0].t>60000) hrSeries.shift();
+  computeRsa(now);
+  drawGraph();
+}
+function computeRmssd(){
+  if(rr.length<3){ return; }
+  const use=rr.slice(-40);
+  let sum=0,n=0;
+  for(let i=1;i<use.length;i++){ const d=use[i]-use[i-1]; sum+=d*d; n++; }
+  rmssd=Math.sqrt(sum/n);
+  $('#rmssdVal').textContent=Math.round(rmssd);
+}
+function computeRsa(now){
+  // peak-to-trough HR swing over the last ~breath cycle window (RSA amplitude)
+  const cyc=(state.settings.in+state.settings.h1+state.settings.out+state.settings.h2);
+  const win = Math.max(8000, cyc*1000*1.2);
+  const seg=hrSeries.filter(p=>now-p.t<=win).map(p=>p.hr);
+  if(seg.length<4){ return; }
+  const max=Math.max(...seg), min=Math.min(...seg);
+  rsaAmp=max-min;
+  $('#rsaVal').textContent=rsaAmp.toFixed(0);
+  // coherence proxy: scale RSA swing (typical good resonance breathing → 10-25 bpm swing)
+  coherence=Math.max(0,Math.min(100, (rsaAmp-3)/20*100));
+  $('#cohFill').style.width=coherence.toFixed(0)+'%';
+  $('#cohPct').textContent=coherence.toFixed(0)+'%';
+}
+
+/* graph */
+const cv=$('#hrvGraph'); let cx;
+function sizeCanvas(){
+  const r=cv.getBoundingClientRect(); const dpr=window.devicePixelRatio||1;
+  cv.width=r.width*dpr; cv.height=r.height*dpr; cx=cv.getContext('2d'); cx.scale(dpr,dpr);
+}
+function drawGraph(){
+  if(!cx) sizeCanvas();
+  const r=cv.getBoundingClientRect(); const W=r.width,H=r.height;
+  cx.clearRect(0,0,W,H);
+  if(hrSeries.length<2){ return; }
+  const now=performance.now(), span=60000;
+  const hrs=hrSeries.map(p=>p.hr);
+  let lo=Math.min(...hrs)-2, hi=Math.max(...hrs)+2; if(hi-lo<8){ const m=(hi+lo)/2; lo=m-4; hi=m+4; }
+  // grid
+  cx.strokeStyle='rgba(255,255,255,.06)'; cx.lineWidth=1;
+  for(let i=1;i<4;i++){ const y=H*i/4; cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke(); }
+  // line
+  cx.beginPath();
+  hrSeries.forEach((p,i)=>{
+    const x=W*(1-(now-p.t)/span);
+    const y=H-((p.hr-lo)/(hi-lo))*H;
+    i?cx.lineTo(x,y):cx.moveTo(x,y);
+  });
+  cx.strokeStyle='#7ee0c9'; cx.lineWidth=2; cx.lineJoin='round'; cx.stroke();
+  // fill
+  const last=hrSeries[hrSeries.length-1];
+  cx.lineTo(W*(1-(now-last.t)/span),H); cx.lineTo(0,H); cx.closePath();
+  cx.fillStyle='rgba(95,176,255,.12)'; cx.fill();
+}
+window.addEventListener('resize',()=>{ sizeCanvas(); drawGraph(); });
+
+/* HRV breathing pacer (orb keeps moving in HRV mode) */
+let pacer=null;
+function startHrvPacer(){
+  stopHrvPacer();
+  const s=state.settings; const seq=[
+    {name:'Einatmen',dur:s.in,scale:1.0,glide:[196,392],vibe:80},
+    ...(s.h1>0?[{name:'Halten',dur:s.h1,scale:1.0,glide:null,vibe:20}]:[]),
+    {name:'Ausatmen',dur:s.out,scale:.42,glide:[392,196],vibe:[0,50]},
+    ...(s.h2>0?[{name:'Halten',dur:s.h2,scale:.42,glide:null,vibe:20}]:[]),
+  ];
+  let i=0; pacer={timer:null,raf:null,seq,start:performance.now()};
+  function enter(k){
+    const ph=seq[k]; pacer.start=performance.now(); phaseLabel.textContent=ph.name;
+    setScale(orb,ph.scale,ph.dur); setScale(orbCore,ph.scale===1.0?1.0:.5,ph.dur);
+    if(ph.glide) glide(ph.glide[0],ph.glide[1],ph.dur);
+    if(ph.vibe) vibrate(ph.vibe);
+    pacer.timer=setTimeout(()=>{ i=(i+1)%seq.length; enter(i); }, ph.dur*1000);
+  }
+  function tick(){
+    const ph=seq[i]; const left=Math.max(0,Math.ceil(ph.dur-(performance.now()-pacer.start)/1000));
+    countNum.textContent=left; pacer.raf=requestAnimationFrame(tick);
+  }
+  enter(0); tick();
+}
+function stopHrvPacer(){ if(pacer){ clearTimeout(pacer.timer); cancelAnimationFrame(pacer.raf); pacer=null; } }
+
+/* ---------- Toast ---------- */
+let toastT=null;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),4200); }
+
+/* ---------- Init ---------- */
+load(); syncControls(); syncHint(); resetStatsLabels(); resetOrb();
+subLabel.textContent=subText();
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>
