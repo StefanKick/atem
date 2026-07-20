@@ -72,12 +72,13 @@ git add -A && git commit -m "..." && git push
 
 ---
 
-## Ideen-Backlog (bei Bedarf)
-- Datei-Upload für eigene Meditationsmusik/Field-Recording (lokal gespeichert) als Alternative zur synthetischen Ambience.
+## Ideen-Backlog (offen)
 - Echter FFT-Kohärenz-Score im 0,1-Hz-Band (statt RSA-Amplituden-Näherung).
-- Garmin-Nacht-HRV per manuellem Eintrag mitloggen → Übung vs. Langzeit-HRV in einer Kurve.
 - Kalibrierung der Kohärenz-Skala / Zielwert-Logik an Stefans reale Polar-Werte.
 - Klick-Timbre-Varianten (Holz-Tock / Glöckchen), getrennte Klänge für Ein-/Ausatmen.
+- Datei-Upload für eigene Meditationsmusik/Field-Recording als Alternative zur synthetischen Ambience.
+- Optional: 1-Klick-Garmin-Auto-Sync über privaten Gist (App zieht JSON per URL) — nur mit ausdrücklichem OK (Health-Daten).
+- Mehrfach-Löschen / Auto-Ausblenden von Messfehlern (Qualität < X %).
 
 ## Versionen
 - **v1** Resonanz · Seufzer · HRV-Live (Polar)
@@ -86,3 +87,7 @@ git add -A && git commit -m "..." && git push
 - **v4** Angenehmer Klang statt Sirene (Pad ohne Pitch-Sweep) + Klangfarbe-Wahl
 - **v5** Atem-gekoppelter Hintergrund (Meer/Drone), prozedural
 - **v6** Atem-Ton „Klick" + Hintergrund entkoppelbar (steady Klangteppich)
+- **v7** Alle HRV-Werte interpretiert + antippbare Erklärungen · stärkere Ein-/Ausatem-Visualisierung · Seufzer nach Zeit/Anzahl · optionales Polar-Mitmessen bei Resonanz
+- **v8** Garmin Nacht-HRV Import (In-App-CSV, eigener Modus/Trend, persönliche Baseline) + Python-Tool
+- **v9** Resonanz-Frequenz-Assistent · Puls-Kreis (Ruhemessung) · Tagesform-Ampel · Erinnerungen (In-App + ICS) · Garmin Auto-Pull (Login) im Python-Tool
+- **v10** Einzelne Verlaufs-Einträge löschbar (Zeile + Auswertung)
