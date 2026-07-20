@@ -150,6 +150,12 @@
   .mtable .verdict{color:var(--dim); font-size:11.5px; text-align:right;}
   .vdot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle;}
   .sec-h{font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin:18px 0 8px;}
+  .mtable tr.mrow{cursor:pointer;}
+  .mtable tr.mrow .info-ic{color:var(--teal); font-size:10px; opacity:.75; margin-left:3px;}
+  .mtable tr.expl{display:none;}
+  .mtable tr.expl.open{display:table-row;}
+  .mtable tr.expl td{color:var(--dim); font-size:12px; line-height:1.65; background:#0f1c30; padding:11px 13px;}
+  .mtable tr.expl td b{color:var(--teal);}
   .hide{display:none !important;}
   .toast{position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:#1d2c44; border:1px solid var(--line); color:var(--txt); padding:12px 18px; border-radius:12px; font-size:13px; z-index:50; opacity:0; transition:.3s; max-width:88vw; text-align:center;}
   .toast.show{opacity:1;}
@@ -244,9 +250,13 @@
     <p class="hint" id="rateHint"></p>
     <div class="field" id="resDurField" style="margin-top:14px;"><label>Dauer <b><span id="durVal">5</span> Min</b></label><input type="range" id="durRange" min="1" max="45" step="1" value="5"></div>
     <div class="toggle" style="border-top:none; padding-top:0;"><span>Ohne Zeitlimit (manuell stoppen)</span><div class="switch" id="swResNoLimit"></div></div>
+    <div class="toggle"><span>HRV mit Polar mitmessen</span><div class="switch" id="swMeasure"></div></div>
+    <p class="hint">Resonanzatmung ist HRV-Training pur (0,1-Hz-Resonanz, Vagus). Mit Polar bekommst du danach die volle Auswertung — der „Polar verbinden"-Knopf erscheint dann unten.</p>
   </div>
   <div id="sighSettings" class="hide">
-    <div class="field"><label>Anzahl Seufzer <b><span id="sighVal">4</span></b></label><input type="range" id="sighRange" min="1" max="12" step="1" value="4"></div>
+    <div class="seg" style="margin-bottom:14px;"><button id="sighModeCount" class="on">nach Anzahl</button><button id="sighModeTime">nach Zeit</button></div>
+    <div class="field" id="sighCountField"><label>Anzahl Seufzer <b><span id="sighVal">4</span></b></label><input type="range" id="sighRange" min="1" max="12" step="1" value="4"></div>
+    <div class="field hide" id="sighDurField"><label>Dauer <b><span id="sighDurVal">3</span> Min</b></label><input type="range" id="sighDurRange" min="1" max="20" step="1" value="3"></div>
     <p class="hint">Tief durch die Nase einatmen → kurz nachziehen → lang durch den Mund ausatmen. Bei Seitenstechen 3–4×.</p>
   </div>
   <div id="hrvSettings" class="hide">
@@ -307,7 +317,8 @@
 const $ = s => document.querySelector(s);
 
 const DEF = { in:4, h1:0, out:6, h2:0, resDurMin:5, resNoLimit:false, hrvDurMin:5, hrvNoLimit:false,
-              scanDurMin:3, sighCount:4, hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989 };
+              scanDurMin:3, sighCount:4, sighMode:'count', sighDurMin:3, measure:false,
+              hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989 };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -416,8 +427,15 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 
 /* ---------- Orb ---------- */
 const orb=$('#orb'), orbCore=$('#orbCore'), countNum=$('#countNum'), phaseLabel=$('#phaseLabel'), subLabel=$('#subLabel');
-function setScale(el,s,secs){ el.classList.remove('no-anim'); el.style.transition=secs>0?`transform ${secs}s cubic-bezier(.37,0,.63,1)`:'none'; el.style.transform=`scale(${s})`; }
-function resetOrb(){ orb.classList.add('no-anim'); orbCore.classList.add('no-anim'); orb.style.transform='scale(.42)'; orbCore.style.transform='scale(.5)'; countNum.textContent=''; }
+function setScale(el,s,secs){ el.classList.remove('no-anim'); el.style.transition=secs>0?`transform ${secs}s cubic-bezier(.37,0,.63,1), filter ${secs}s ease, opacity ${secs}s ease`:'none'; el.style.transform=`scale(${s})`; }
+function resetOrb(){ orb.classList.add('no-anim'); orbCore.classList.add('no-anim'); orb.style.transform='scale(.40)'; orbCore.style.transform='scale(.5)'; orb.style.filter='brightness(1)'; countNum.textContent=''; }
+/* strong inhale/exhale visual cue: scale + brightness + subtle color */
+function orbCue(name,secs){
+  if(name==='Einatmen'||name==='Nachziehen') orb.style.filter='brightness(1.4) saturate(1.25)';
+  else if(name==='Ausatmen') orb.style.filter='brightness(.72) saturate(.9)';
+  else orb.style.filter='brightness(1.0)';
+}
+function phaseTitle(name){ return name + (name==='Einatmen'?' ↑':(name==='Ausatmen'?' ↓':(name==='Nachziehen'?' ↑↑':''))); }
 function fmt(ms){ const s=Math.round(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function fmtM(sec){ const m=Math.floor(sec/60), s=sec%60; return m?`${m} Min`:`${s} Sek`; }
 
@@ -426,31 +444,36 @@ function fmtM(sec){ const m=Math.floor(sec/60), s=sec%60; return m?`${m} Min`:`$
    ============================================================ */
 let engine=null;
 function stopEngine(){ if(engine){ clearTimeout(engine.timer); cancelAnimationFrame(engine.raf); engine=null; } }
-function buildSeq(){ const s=state.settings, seq=[]; seq.push({name:'Einatmen',dur:s.in,scale:1.0,glide:[196,392],vibe:90,breath:true}); if(s.h1>0) seq.push({name:'Halten',dur:s.h1,scale:1.0,glide:null,vibe:30}); seq.push({name:'Ausatmen',dur:s.out,scale:.42,glide:[392,196],vibe:[0,60]}); if(s.h2>0) seq.push({name:'Halten',dur:s.h2,scale:.42,glide:null,vibe:30}); return seq; }
+function buildSeq(){ const s=state.settings, seq=[]; seq.push({name:'Einatmen',dur:s.in,scale:1.0,glide:[196,392],vibe:90,breath:true}); if(s.h1>0) seq.push({name:'Halten',dur:s.h1,scale:1.0,glide:null,vibe:30}); seq.push({name:'Ausatmen',dur:s.out,scale:.30,glide:[392,196],vibe:[0,60]}); if(s.h2>0) seq.push({name:'Halten',dur:s.h2,scale:.30,glide:null,vibe:30}); return seq; }
+function bleConnected(){ return !!(bleDevice && bleDevice.gatt && bleDevice.gatt.connected); }
 
 function startBreathing(isHrv){
   const s=state.settings, seq=buildSeq();
+  // Resonanz kann optional mit Polar mitmessen → dann wie ein HRV-Training auswerten
+  const recording = isHrv || (s.measure && bleConnected());
   const noLimit = isHrv ? s.hrvNoLimit : s.resNoLimit;
   const limitMs = (isHrv ? s.hrvDurMin : s.resDurMin)*60*1000;
   const t0=performance.now(); let idx=0, breaths=0, phaseStart=performance.now();
   engine={timer:null,raf:null};
-  if(isHrv) startRec('train');
+  if(recording) startRec('train');
   startAmbient();
   document.querySelectorAll('#statsRow .l')[0].textContent = noLimit?'Zeit':'Restzeit';
   document.querySelectorAll('#statsRow .l')[1].textContent = 'Atemzüge';
-  function enter(i){ const ph=seq[i]; phaseStart=performance.now(); phaseLabel.textContent=ph.name;
-    setScale(orb,ph.scale,ph.dur); setScale(orbCore,ph.scale===1.0?1.0:.5,ph.dur);
+  function enter(i){ const ph=seq[i]; phaseStart=performance.now(); phaseLabel.textContent=phaseTitle(ph.name);
+    setScale(orb,ph.scale,ph.dur); setScale(orbCore,ph.scale===1.0?1.05:.45,ph.dur); orbCue(ph.name,ph.dur);
     if(ph.glide) glide(ph.glide[0],ph.glide[1],ph.dur); if(ph.vibe) vibrate(ph.vibe); ambientPhase(ph);
     if(ph.breath){ breaths++; if(!isHrv) $('#statBreaths').textContent=breaths; }
     engine.timer=setTimeout(()=>{ idx=(idx+1)%seq.length; enter(idx); }, ph.dur*1000); }
   function tick(){ const now=performance.now(), elapsed=now-t0;
-    if(!isHrv){ if(noLimit){ $('#statTime').textContent=fmt(elapsed); } else { const rem=Math.max(0,limitMs-elapsed); $('#statTime').textContent=fmt(rem); if(rem<=0){ finishResonance(breaths,elapsed); return; } } }
-    else { if(noLimit){ $('#hrvTime').textContent=fmt(elapsed); } else { const rem=Math.max(0,limitMs-elapsed); $('#hrvTime').textContent=fmt(rem); if(rem<=0){ finishHrv(elapsed); return; } } }
+    const timeEl = isHrv ? $('#hrvTime') : $('#statTime');
+    if(noLimit){ timeEl.textContent=fmt(elapsed); }
+    else { const rem=Math.max(0,limitMs-elapsed); timeEl.textContent=fmt(rem);
+      if(rem<=0){ recording? finishHrv(elapsed) : finishResonance(breaths,elapsed); return; } }
     const ph=seq[idx]; countNum.textContent=Math.max(0,Math.ceil(ph.dur-(now-phaseStart)/1000)); engine.raf=requestAnimationFrame(tick); }
-  engine._meta={isHrv,scan:false,breaths:()=>breaths,elapsed:()=>performance.now()-t0};
+  engine._meta={isHrv,scan:false,record:recording,breaths:()=>breaths,elapsed:()=>performance.now()-t0};
   enter(0); tick();
 }
-function finishResonance(breaths,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.42,2); setScale(orbCore,.5,2); logSession({mode:'resonance',dur:Math.round(elapsedMs/1000),breaths}); subLabel.textContent=`${breaths} Atemzüge · gespeichert ✓`; relWake(); setRunning(false); }
+function finishResonance(breaths,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.30,2); setScale(orbCore,.45,2); orb.style.filter='brightness(1)'; logSession({mode:'resonance',dur:Math.round(elapsedMs/1000),breaths}); subLabel.textContent=`${breaths} Atemzüge · gespeichert ✓`; relWake(); setRunning(false); }
 function doneChime(){ chime(660,0.6); setTimeout(()=>chime(880,0.7),180); vibrate([120,80,120]); }
 
 /* ---------- Resting scan (no pacing) ---------- */
@@ -467,7 +490,7 @@ function startScan(){
   tick();
 }
 function finishHrv(elapsedMs){
-  stopEngine(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.42,2); setScale(orbCore,.5,2);
+  stopEngine(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.30,2); setScale(orbCore,.45,2); orb.style.filter='brightness(1)';
   const data=stopRec(); const isScan=data.mode==='scan';
   const m=computeAllMetrics(data.rr);
   let rec={ mode:isScan?'scan':'hrv', dur:Math.round(elapsedMs/1000), quality:data.quality,
@@ -489,15 +512,21 @@ function adaptTarget(cohAvg){ let t=state.settings.hrvTarget; t=Math.round(0.7*t
 
 /* ---------- Sigh ---------- */
 function startSigh(){
-  const n=state.settings.sighCount; let cycle=0; const t0=performance.now(); engine={timer:null,raf:null};
-  document.querySelectorAll('#statsRow .l')[0].textContent='Ziel'; document.querySelectorAll('#statsRow .l')[1].textContent='Erledigt';
-  $('#statTime').textContent=n; $('#statBreaths').textContent=0; startAmbient();
-  const steps=[{name:'Einatmen',sub:'tief durch die Nase',dur:1.6,scale:.85,glide:[196,340],vibe:70},{name:'Nachziehen',sub:'noch ein kleiner Zug',dur:1.0,scale:1.0,glide:[340,440],vibe:40},{name:'Ausatmen',sub:'lang durch den Mund',dur:6.0,scale:.42,glide:[440,180],vibe:[0,70]},{name:'Pause',sub:'kurz ruhen',dur:1.4,scale:.42,glide:null,vibe:20}];
-  function enter(k){ const st=steps[k]; phaseLabel.textContent=st.name; subLabel.textContent=st.sub; countNum.textContent=''; setScale(orb,st.scale,st.dur); setScale(orbCore,st.scale===1.0?1.0:.5,st.dur); if(st.glide) glide(st.glide[0],st.glide[1],st.dur); if(st.vibe) vibrate(st.vibe); ambientPhase(st);
-    engine.timer=setTimeout(()=>{ let nx=k+1; if(nx>=steps.length){ cycle++; $('#statBreaths').textContent=cycle; if(cycle>=n){ finishSigh(cycle,performance.now()-t0); return; } nx=0; } enter(nx); }, st.dur*1000); }
+  const s=state.settings, byTime=s.sighMode==='time', n=s.sighCount, limitMs=s.sighDurMin*60*1000;
+  let cycle=0; const t0=performance.now(); engine={timer:null,raf:null};
+  document.querySelectorAll('#statsRow .l')[0].textContent = byTime?'Restzeit':'Ziel';
+  document.querySelectorAll('#statsRow .l')[1].textContent='Erledigt';
+  $('#statTime').textContent = byTime?fmt(limitMs):n; $('#statBreaths').textContent=0; startAmbient();
+  const steps=[{name:'Einatmen',sub:'tief durch die Nase',dur:1.6,scale:.90,glide:[196,340],vibe:70},{name:'Nachziehen',sub:'noch ein kleiner Zug',dur:1.0,scale:1.0,glide:[340,440],vibe:40},{name:'Ausatmen',sub:'lang durch den Mund',dur:6.0,scale:.30,glide:[440,180],vibe:[0,70]},{name:'Pause',sub:'kurz ruhen',dur:1.4,scale:.30,glide:null,vibe:20}];
+  function enter(k){ const st=steps[k]; phaseLabel.textContent=phaseTitle(st.name); subLabel.textContent=st.sub; countNum.textContent=''; setScale(orb,st.scale,st.dur); setScale(orbCore,st.scale===1.0?1.05:.45,st.dur); orbCue(st.name,st.dur); if(st.glide) glide(st.glide[0],st.glide[1],st.dur); if(st.vibe) vibrate(st.vibe); ambientPhase(st);
+    if(byTime) $('#statTime').textContent=fmt(Math.max(0,limitMs-(performance.now()-t0)));
+    engine.timer=setTimeout(()=>{ let nx=k+1; if(nx>=steps.length){ cycle++; $('#statBreaths').textContent=cycle;
+      const done = byTime ? (performance.now()-t0>=limitMs) : (cycle>=n);
+      if(done){ finishSigh(cycle,performance.now()-t0); return; } nx=0; } enter(nx); }, st.dur*1000); }
+  engine._meta={isHrv:false,scan:false,record:false,breaths:()=>cycle,elapsed:()=>performance.now()-t0};
   enter(0);
 }
-function finishSigh(count,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; subLabel.textContent=`${count} Seufzer · gespeichert ✓`; countNum.textContent=''; setScale(orb,.42,2); setScale(orbCore,.5,2); logSession({mode:'sigh',dur:Math.round(elapsedMs/1000),cycles:count}); relWake(); setRunning(false); }
+function finishSigh(count,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; subLabel.textContent=`${count} Seufzer · gespeichert ✓`; countNum.textContent=''; setScale(orb,.30,2); setScale(orbCore,.45,2); orb.style.filter='brightness(1)'; logSession({mode:'sigh',dur:Math.round(elapsedMs/1000),cycles:count}); relWake(); setRunning(false); }
 
 /* ---------- Start/Stop ---------- */
 function setRunning(on){ state.running=on; const b=$('#startBtn'); b.textContent=on?'Stopp':'Start'; b.classList.toggle('stop',on); }
@@ -505,10 +534,11 @@ const startBtn=$('#startBtn');
 startBtn.addEventListener('click',()=>{
   ensureAudio();
   if(state.running){
-    const meta=engine&&engine._meta?{isHrv:engine._meta.isHrv,scan:engine._meta.scan,breaths:engine._meta.breaths(),elapsed:engine._meta.elapsed()}:null;
+    const meta=engine&&engine._meta?{isHrv:engine._meta.isHrv,scan:engine._meta.scan,record:engine._meta.record,breaths:engine._meta.breaths(),elapsed:engine._meta.elapsed()}:null;
     stopEngine();
-    if(meta){ if(meta.isHrv){ if(meta.elapsed>20000){ finishHrv(meta.elapsed); return; } else { stopRec(); } }
-              else if(meta.elapsed>15000){ logSession({mode:'resonance',dur:Math.round(meta.elapsed/1000),breaths:meta.breaths}); } }
+    if(meta){ const recSess = meta.record || meta.scan;
+      if(recSess){ if(meta.elapsed>20000){ finishHrv(meta.elapsed); return; } else { stopRec(); } }
+      else if(state.mode==='resonance' && meta.elapsed>15000){ logSession({mode:'resonance',dur:Math.round(meta.elapsed/1000),breaths:meta.breaths}); } }
     stopAmbient(); relWake(); resetOrb(); phaseLabel.textContent='Bereit'; subLabel.textContent=subText(); setRunning(false); return;
   }
   resetOrb(); reqWake(); setRunning(true);
@@ -532,7 +562,7 @@ function switchMode(m){
   $('#hrvPanel').classList.toggle('hide',m!=='hrv');
   $('#statsRow').classList.toggle('hide',m==='hrv'||isHist);
   $('#histView').classList.toggle('hide',!isHist);
-  $('#hrvRow').classList.toggle('hide',m!=='hrv');
+  $('#hrvRow').classList.toggle('hide', !(m==='hrv' || (state.settings.measure && m==='resonance')));
   $('#controls').classList.toggle('hide',isHist);
   $('#gearBtn').classList.toggle('hide',isHist);
   $('#resSettings').classList.toggle('hide',m!=='resonance');
@@ -569,8 +599,12 @@ bindRange('#inRange','in','#inVal',syncHint); bindRange('#h1Range','h1','#h1Val'
 bindRange('#durRange','resDurMin','#durVal',()=>{ if(!state.running) resetStatsLabels(); });
 bindRange('#hrvDurRange','hrvDurMin','#hrvDurVal'); bindRange('#scanDurRange','scanDurMin','#scanDurVal');
 $('#sighRange').addEventListener('input',e=>{ state.settings.sighCount=+e.target.value; $('#sighVal').textContent=e.target.value; });
+$('#sighDurRange').addEventListener('input',e=>{ state.settings.sighDurMin=+e.target.value; $('#sighDurVal').textContent=e.target.value; });
+$('#sighModeCount').addEventListener('click',()=>{ state.settings.sighMode='count'; syncSighMode(); save(); });
+$('#sighModeTime').addEventListener('click',()=>{ state.settings.sighMode='time'; syncSighMode(); save(); });
+function syncSighMode(){ const t=state.settings.sighMode==='time'; $('#sighModeCount').classList.toggle('on',!t); $('#sighModeTime').classList.toggle('on',t); $('#sighCountField').classList.toggle('hide',t); $('#sighDurField').classList.toggle('hide',!t); }
 document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{ state.settings.in=+c.dataset.in; state.settings.out=+c.dataset.out; state.settings.h1=0; state.settings.h2=0; syncControls(); syncHint(); }));
-function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; syncSoundStyle(); syncBg(); $('#bgVolRange').value=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); $('#bgVolVal').textContent=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); subLabel.textContent=subText(); }
+function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#sighDurRange').value=s.sighDurMin; $('#sighDurVal').textContent=s.sighDurMin; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#swMeasure').classList.toggle('on',s.measure); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; syncSoundStyle(); syncBg(); syncSighMode(); $('#bgVolRange').value=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); $('#bgVolVal').textContent=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); subLabel.textContent=subText(); }
 function syncHint(){ const s=state.settings, cyc=s.in+s.h1+s.out+s.h2, bpm=(60/cyc).toFixed(1); let msg=`≈ ${bpm} Atemzüge/Min.`; if(bpm>=4.5&&bpm<=7) msg+=' 👍 Im Resonanz-Bereich — ideal für die HRV.'; else if(bpm>7) msg+=' Tipp: Für maximale HRV langsamer (4,5–7/Min).'; $('#rateHint').textContent=msg; document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',+c.dataset.in===s.in&&+c.dataset.out===s.out&&s.h1===0&&s.h2===0)); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; if(!state.running) subLabel.textContent=subText(); }
 function bindSwitch(id,key,cb){ const el=$(id); el.classList.toggle('on',state.settings[key]); el.addEventListener('click',()=>{ state.settings[key]=!state.settings[key]; el.classList.toggle('on',state.settings[key]); cb&&cb(); save(); }); }
 bindSwitch('#swSound','sound',()=>{ if(state.settings.sound) previewTone(); }); bindSwitch('#swVibe','vibe');
@@ -589,6 +623,7 @@ $('#bgVolRange').addEventListener('input',e=>{ const v=+e.target.value; state.se
 bindSwitch('#swResNoLimit','resNoLimit',()=>{ $('#resDurField').classList.toggle('dim',state.settings.resNoLimit); if(!state.running) resetStatsLabels(); });
 bindSwitch('#swHrvNoLimit','hrvNoLimit',()=>{ $('#hrvDurField').classList.toggle('dim',state.settings.hrvNoLimit); });
 bindSwitch('#swBgCouple','bgCouple',()=>{ if(state.running){ ensureAudio(); stopAmbient(true); startAmbient(); } else previewBg(); });
+bindSwitch('#swMeasure','measure',()=>{ $('#hrvRow').classList.toggle('hide', !(state.mode==='hrv' || (state.settings.measure && state.mode==='resonance'))); });
 
 /* ---------- Persistence ---------- */
 function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
@@ -716,6 +751,7 @@ function openResult(r){
   // interpretation + table
   $('#resInterpret').innerHTML = interpretSession(r, isScan);
   $('#metricRows').innerHTML = metricRows(r, isScan);
+  document.querySelectorAll('#metricRows .mrow').forEach(el=>el.addEventListener('click',()=>{ const ex=$('#expl-'+el.dataset.mi); if(ex) ex.classList.toggle('open'); }));
   $('#resDisclaimer').innerHTML = isScan
     ? 'Normwerte: Ruhe, spontane Atmung (Nunan 2010). Einzelmessung ist tagesformabhängig — der Wochen-Trend zählt.'
     : 'Achtung: Bei ~6/min-Atmung sind SDNN, LF &amp; Total Power trainingsbedingt stark erhöht (0,1-Hz-Resonanz) — das ist der gewünschte Effekt, nicht mit Ruhe-Normwerten vergleichbar. Für Baseline die Ruhemessung nutzen.';
@@ -757,21 +793,39 @@ function vdot(cls){ const c={good:'var(--good)',mid:'var(--mid)',low:'var(--bad)
 function band(v,norm){ if(v==null) return 'neutral'; if(v<norm.lo) return 'low'; if(v>norm.hi) return 'good'; return 'mid'; }
 function row(name,sub,val,unit,verdict){ return `<tr><td class="name">${name}<small>${sub}</small></td><td class="val" style="text-align:right">${val!=null?val:'–'}${unit?' '+unit:''}</td><td class="verdict">${verdict||''}</td></tr>`; }
 function r1(x){ return x!=null?Math.round(x):null; }
+const METRIC_INFO = {
+  meanHR:'Durchschnittlicher Puls (Schläge/Min). Beim langsamen Ausatmen sinkt er kurz — der gesunde Vagus-Effekt. Ein niedriger Ruhepuls spricht meist für gute Fitness/Erholung.',
+  rmssd:'<b>Der wichtigste Erholungs-Marker.</b> Misst die Schwankung zwischen aufeinanderfolgenden Herzschlägen; hoch = aktiver Vagus (Parasympathikus) = gute Regeneration. Ruhe-Norm Ø 42 ms (19–75), stark alters- und tagesformabhängig → auf den Wochen-Trend schauen, nicht auf den Einzelwert.',
+  sdnn:'Gesamt-Variabilität des Herzrhythmus (Streuung aller Schlag-Intervalle). Spiegelt Sympathikus + Parasympathikus zusammen. Ruhe-Norm Ø 50 ms (32–93). Bei langsamer Atmung stark erhöht — gewollt.',
+  pnn50:'Anteil aufeinanderfolgender Herzschläge, die sich um mehr als 50 ms unterscheiden. Weiterer Vagus-/Erholungs-Marker; läuft parallel zu RMSSD.',
+  sd1:'Poincaré-Kurzzeit-Streuung, mathematisch ≈ RMSSD/√2 → misst dasselbe: Vagus/Erholung. In einem Poincaré-Diagramm die „Breite" der Punktwolke.',
+  sd2:'Poincaré-Langzeit-Streuung — die langsameren Schwankungen. Zusammen mit SD1 beschreibt sie die Form/Balance deiner Herzratenvariabilität.',
+  lf:'Leistung im Low-Frequency-Band (0,04–0,15 Hz), gemischt (nicht rein sympathisch). <b>Bei ~6/min-Atmung liegt die Atmung genau hier (0,1 Hz) → LF schießt hoch.</b> Das ist der Resonanz-Trainingseffekt, kein Stress.',
+  hf:'Leistung im High-Frequency-Band (0,15–0,40 Hz) = atem-getriebener Vagus-Anteil. Bei normalem Atmen groß; bei langsamer 6/min-Atmung klein, weil die Atem-Energie ins LF-Band wandert.',
+  vlf:'Very-Low-Frequency (0,003–0,04 Hz). Braucht lange Messungen (>4–5 Min) für verlässliche Werte — bei kurzen Sitzungen nur grob deuten.',
+  totpow:'Gesamte Variabilitäts-Leistung (VLF+LF+HF) — Grobmaß der gesamten HRV. Bei Resonanzatmung trainingsbedingt hoch.',
+  lfhf:'Verhältnis LF zu HF, früher als „Stress-Balance" gedeutet — <b>wissenschaftlich umstritten</b> und bei bewusst langsamem Atmen NICHT als Stress interpretierbar (der LF-Peak ist dann atem-, nicht stressbedingt).',
+  quality:'Anteil sauber erkannter Herzschläge. Unter ~90 %: Gurt-Elektroden anfeuchten und Sitz prüfen — verrauschte Schläge verfälschen alle Werte.'
+};
+function scanVerdict(v,norm){ return vdot(band(v,norm))+refTxt(v,norm); }
 function metricRows(r,isScan){
-  const t=[]; const inflated = !isScan; // training inflates freq/sdnn
-  t.push(row('Ø Puls','Mean HR', r1(r.meanHR),'bpm',''));
-  t.push(row('RMSSD','Vagus / Erholung', r1(r.rmssd),'ms', isScan? vdot(band(r.rmssd,NORM.rmssd))+refTxt(r.rmssd,NORM.rmssd) : vdot('neutral')+'Trend zählt'));
-  t.push(row('SDNN','Gesamt-Variabilität', r1(r.sdnn),'ms', isScan? vdot(band(r.sdnn,NORM.sdnn))+refTxt(r.sdnn,NORM.sdnn) : vdot('neutral')+'trainingsbedingt ↑'));
-  t.push(row('pNN50','Vagus', r.pnn50!=null?r.pnn50.toFixed(1):null,'%', isScan? vdot(band(r.pnn50,NORM.pnn50))+refTxt(r.pnn50,NORM.pnn50) : vdot('neutral')+'—'));
-  t.push(row('SD1','kurzfr. (=RMSSD/√2)', r1(r.sd1),'ms', vdot('neutral')+'Vagus'));
-  t.push(row('SD2','langfristig', r1(r.sd2),'ms', vdot('neutral')+'—'));
-  t.push(row('LF Power','0,04–0,15 Hz', r1(r.lf),'ms²', isScan? vdot(band(r.lf,NORM.lf))+refTxt(r.lf,NORM.lf) : vdot('good')+'Resonanz ↑ (gewollt)'));
-  t.push(row('HF Power','0,15–0,40 Hz · Vagus', r1(r.hf),'ms²', isScan? vdot(band(r.hf,NORM.hf))+refTxt(r.hf,NORM.hf) : vdot('neutral')+'—'));
-  t.push(row('VLF Power','0,003–0,04 Hz', r1(r.vlf),'ms²', vdot('neutral')+'—'));
-  t.push(row('Total Power','Gesamtleistung', r1(r.totpow),'ms²', isScan? vdot('neutral')+'—' : vdot('good')+'trainingsbedingt ↑'));
-  t.push(row('LF/HF','Balance (umstritten)', r.lfhf!=null?r.lfhf.toFixed(1):null,'', isScan? vdot('neutral')+refTxt(r.lfhf,NORM.lfhf) : vdot('neutral')+'bei paced n. deutbar'));
-  t.push(row('Qualität','gültige Schläge', r.quality,'%', r.quality>=90?vdot('good')+'sehr gut':(r.quality>=75?vdot('mid')+'ok':vdot('low')+'Gurt prüfen')));
-  return t.join('');
+  const M=[
+    {k:'meanHR', name:'Ø Puls', sub:'Mean HR', val:r1(r.meanHR), unit:'bpm', verdict:vdot('neutral')+'Ruhepuls'},
+    {k:'rmssd', name:'RMSSD', sub:'Vagus / Erholung', val:r1(r.rmssd), unit:'ms', verdict: isScan?scanVerdict(r.rmssd,NORM.rmssd):vdot('good')+'trainingsbedingt ↑ · Trend zählt'},
+    {k:'sdnn', name:'SDNN', sub:'Gesamt-Variabilität', val:r1(r.sdnn), unit:'ms', verdict: isScan?scanVerdict(r.sdnn,NORM.sdnn):vdot('good')+'trainingsbedingt ↑'},
+    {k:'pnn50', name:'pNN50', sub:'Vagus', val:(r.pnn50!=null?r.pnn50.toFixed(1):null), unit:'%', verdict: isScan?scanVerdict(r.pnn50,NORM.pnn50):vdot('neutral')+'durch langsames Atmen ↑'},
+    {k:'sd1', name:'SD1', sub:'Poincaré kurz (≈RMSSD/√2)', val:r1(r.sd1), unit:'ms', verdict:vdot('neutral')+'Vagus (spiegelt RMSSD)'},
+    {k:'sd2', name:'SD2', sub:'Poincaré langfristig', val:r1(r.sd2), unit:'ms', verdict:vdot('neutral')+'langsame Schwankungen'},
+    {k:'lf', name:'LF Power', sub:'0,04–0,15 Hz', val:r1(r.lf), unit:'ms²', verdict: isScan?scanVerdict(r.lf,NORM.lf):vdot('good')+'Resonanz ↑ (gewollt)'},
+    {k:'hf', name:'HF Power', sub:'0,15–0,40 Hz · Vagus', val:r1(r.hf), unit:'ms²', verdict: isScan?scanVerdict(r.hf,NORM.hf):vdot('neutral')+'klein bei 6/min'},
+    {k:'vlf', name:'VLF Power', sub:'0,003–0,04 Hz', val:r1(r.vlf), unit:'ms²', verdict:vdot('neutral')+((r.dur&&r.dur<270)?'kurze Messung → unsicher':'Langzeit-Band')},
+    {k:'totpow', name:'Total Power', sub:'Gesamtleistung', val:r1(r.totpow), unit:'ms²', verdict: isScan?vdot('neutral')+'Gesamt-HRV':vdot('good')+'trainingsbedingt ↑'},
+    {k:'lfhf', name:'LF/HF', sub:'Balance (umstritten)', val:(r.lfhf!=null?r.lfhf.toFixed(1):null), unit:'', verdict: isScan?vdot('neutral')+refTxt(r.lfhf,NORM.lfhf):vdot('neutral')+'bei paced nicht als Stress deutbar'},
+    {k:'quality', name:'Qualität', sub:'gültige Schläge', val:r.quality, unit:'%', verdict:(r.quality>=90?vdot('good')+'sehr gut':(r.quality>=75?vdot('mid')+'ok':vdot('low')+'Gurt prüfen'))},
+  ];
+  return M.map((m,i)=>{ const valTxt = m.val!=null? m.val+(m.unit?' '+m.unit:'') : '–';
+    return `<tr class="mrow" data-mi="${i}"><td class="name">${m.name} <span class="info-ic">ⓘ</span><small>${m.sub}</small></td><td class="val" style="text-align:right">${valTxt}</td><td class="verdict">${m.verdict||''}</td></tr>`
+      + `<tr class="expl" id="expl-${i}"><td colspan="3">${METRIC_INFO[m.k]||''}</td></tr>`; }).join('');
 }
 function refTxt(v,norm){ if(v==null) return ''; const w=v<norm.lo?'unter':(v>norm.hi?'über':'im'); return `${w} Norm (${norm.lo}–${norm.hi})`; }
 
