@@ -257,12 +257,14 @@
     <p class="hint">Für verlässliche Frequenz-Werte (LF/HF) mind. 3 Min messen.</p>
   </div>
   <div class="toggle"><span>Ton</span><div class="switch on" id="swSound"></div></div>
-  <div class="toggle" id="soundStyleRow"><span>Klangfarbe <small style="color:var(--dim)">(antippen zum Anhören)</small></span>
+  <div class="toggle" id="soundStyleRow"><span>Atem-Ton <small style="color:var(--dim)">(antippen zum Anhören)</small></span>
     <div class="seg" style="width:auto; flex:none; margin:0;">
-      <button id="stylePad" class="on" style="flex:none; padding:6px 14px;">Weich</button>
-      <button id="styleBell" style="flex:none; padding:6px 14px;">Glocke</button>
+      <button id="stylePad" class="on" style="flex:none; padding:6px 10px;">Weich</button>
+      <button id="styleBell" style="flex:none; padding:6px 10px;">Glocke</button>
+      <button id="styleClick" style="flex:none; padding:6px 10px;">Klick</button>
     </div>
   </div>
+  <p class="hint" style="margin:-6px 0 8px;">„Weich" schwillt über den ganzen Atemzug, „Glocke"/„Klick" markieren nur den Wechsel — ideal kombiniert mit einem gleichmäßigen Hintergrund.</p>
   <div class="toggle"><span>Hintergrund <small style="color:var(--dim)">(antippen zum Anhören)</small></span>
     <div class="seg" style="width:auto; flex:none; margin:0;">
       <button id="bgOff" class="on" style="flex:none; padding:6px 11px;">Aus</button>
@@ -271,7 +273,8 @@
     </div>
   </div>
   <div class="field" id="bgVolField" style="margin:10px 0 4px;"><label>Hintergrund-Lautstärke <b><span id="bgVolVal">50</span> %</b></label><input type="range" id="bgVolRange" min="0" max="100" step="5" value="50"></div>
-  <p class="hint" style="margin-bottom:8px;">„Meer" ist an den Atem gekoppelt: Brandung wächst beim Einatmen, ebbt beim Ausatmen — so trennst du Ein-/Ausatmen auch mit geschlossenen Augen.</p>
+  <div class="toggle" id="bgCoupleRow"><span>Hintergrund an Atem koppeln</span><div class="switch on" id="swBgCouple"></div></div>
+  <p class="hint" style="margin-bottom:8px;">Gekoppelt: die Brandung wächst beim Einatmen, ebbt beim Ausatmen. Entkoppelt: gleichmäßiger Klangteppich — dann markiert der Atem-Ton (z. B. „Klick") die Wechsel.</p>
   <div class="toggle"><span>Vibration</span><div class="switch on" id="swVibe"></div></div>
   <div class="toggle"><span>Bildschirm anlassen</span><div class="switch on" id="swWake"></div></div>
   <button class="btn ghost" id="closeSheet" style="margin-top:16px;">Fertig</button>
@@ -304,7 +307,7 @@
 const $ = s => document.querySelector(s);
 
 const DEF = { in:4, h1:0, out:6, h2:0, resDurMin:5, resNoLimit:false, hrvDurMin:5, hrvNoLimit:false,
-              scanDurMin:3, sighCount:4, hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, vibe:true, wake:true, birthYear:1989 };
+              scanDurMin:3, sighCount:4, hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989 };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -321,8 +324,20 @@ function ensureAudio(){ try{ if(!audioCtx) audioCtx=new (window.AudioContext||wi
 function glide(from,to,dur){
   if(!state.settings.sound||!audioCtx) return;
   const inhale = to>=from;                 // call sites pass rising for inhale, falling for exhale
-  if(state.settings.soundStyle==='bell') breathBell(inhale?432:324, dur);
-  else breathPad(inhale?300:225, dur);      // warm mid register, a calm fourth apart
+  const st=state.settings.soundStyle;
+  if(st==='click') clickTone(inhale);       // short gentle marker at the switch only
+  else if(st==='bell') breathBell(inhale?432:324, dur);
+  else breathPad(inhale?300:225, dur);      // warm swell across the phase
+}
+function clickTone(inhale){
+  const t=audioCtx.currentTime, vol=0.17, dur=0.14, base=inhale?660:440;
+  const g=audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  const lp=audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600;
+  const o1=audioCtx.createOscillator(); o1.type='sine'; o1.frequency.value=base;
+  const o2=audioCtx.createOscillator(); o2.type='sine'; o2.frequency.value=base*2; const g2=audioCtx.createGain(); g2.gain.value=0.12;
+  o1.connect(g); o2.connect(g2).connect(g); g.connect(lp).connect(audioCtx.destination);
+  const s=t+dur+0.04; o1.start(t);o2.start(t); o1.stop(s);o2.stop(s);
 }
 function breathPad(base,dur){
   const t=audioCtx.currentTime, vol=0.13;
@@ -364,19 +379,26 @@ function startAmbient(){
     const hp=audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=60;
     const lp=audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=600; lp.Q.value=0.4;
     src.connect(hp).connect(lp).connect(master); src.start();
-    amb={kind,master,src,lp,vol}; master.gain.exponentialRampToValueAtTime(0.12*vol+0.0001,t+2);
+    const couple = state.settings.bgCouple!==false;
+    amb={kind,master,src,lp,vol,couple};
+    if(couple){ master.gain.exponentialRampToValueAtTime(0.12*vol+0.0001,t+2); }
+    else { // steady bed: autonomous slow wave swells, independent of breath
+      master.gain.exponentialRampToValueAtTime(0.2*vol+0.0001,t+2);
+      const lfo=audioCtx.createOscillator(); lfo.type='sine'; lfo.frequency.value=0.1; // ~10 s wave cycle
+      const lg=audioCtx.createGain(); lg.gain.value=0.13*vol; lfo.connect(lg).connect(master.gain); lfo.start(); amb.lfo=lfo;
+    }
   } else if(kind==='drone'){
     const mix=audioCtx.createGain(); mix.gain.value=1;
     const lp=audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=700; lp.Q.value=0.5;
     const notes=[[130.81,'triangle',0.5],[196.00,'sine',0.24],[261.63,'sine',0.18]];
     const oscs=notes.map(([f,ty,gv])=>{ const o=audioCtx.createOscillator(); o.type=ty; o.frequency.value=f; const g=audioCtx.createGain(); g.gain.value=gv; o.connect(g).connect(mix); o.start(); return o; });
-    mix.connect(lp).connect(master); amb={kind,master,oscs,lp,vol}; master.gain.exponentialRampToValueAtTime(0.17*vol+0.0001,t+2);
+    mix.connect(lp).connect(master); amb={kind,master,oscs,lp,vol,couple:state.settings.bgCouple!==false}; master.gain.exponentialRampToValueAtTime(0.17*vol+0.0001,t+2);
   }
 }
 function stopAmbient(immediate){ if(!amb) return; const a=amb; amb=null; const t=audioCtx.currentTime;
   try{ a.master.gain.cancelScheduledValues(t); a.master.gain.setValueAtTime(Math.max(0.0001,a.master.gain.value),t); a.master.gain.exponentialRampToValueAtTime(0.0001,t+(immediate?0.05:0.8)); }catch(e){}
-  const s=t+(immediate?0.12:0.95); try{ a.src&&a.src.stop(s); }catch(e){} try{ a.oscs&&a.oscs.forEach(o=>o.stop(s)); }catch(e){} }
-function ambientPhase(ph){ if(!amb||!audioCtx) return; const t=audioCtx.currentTime, dur=ph.dur||3, vol=amb.vol;
+  const s=t+(immediate?0.12:0.95); try{ a.src&&a.src.stop(s); }catch(e){} try{ a.oscs&&a.oscs.forEach(o=>o.stop(s)); }catch(e){} try{ a.lfo&&a.lfo.stop(s); }catch(e){} }
+function ambientPhase(ph){ if(!amb||!audioCtx||amb.couple===false) return; const t=audioCtx.currentTime, dur=ph.dur||3, vol=amb.vol;
   const inhale=(ph.name==='Einatmen'||ph.name==='Nachziehen'), exhale=(ph.name==='Ausatmen');
   if(amb.kind==='ocean'){ const gTgt=inhale?0.5*vol:(exhale?0.06*vol:0.12*vol), cTgt=inhale?1150:(exhale?360:600);
     try{ const g=amb.master.gain; g.cancelScheduledValues(t); g.setValueAtTime(Math.max(0.0001,g.value),t); g.linearRampToValueAtTime(Math.max(0.0001,gTgt),t+dur*0.9);
@@ -552,9 +574,11 @@ function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#i
 function syncHint(){ const s=state.settings, cyc=s.in+s.h1+s.out+s.h2, bpm=(60/cyc).toFixed(1); let msg=`≈ ${bpm} Atemzüge/Min.`; if(bpm>=4.5&&bpm<=7) msg+=' 👍 Im Resonanz-Bereich — ideal für die HRV.'; else if(bpm>7) msg+=' Tipp: Für maximale HRV langsamer (4,5–7/Min).'; $('#rateHint').textContent=msg; document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',+c.dataset.in===s.in&&+c.dataset.out===s.out&&s.h1===0&&s.h2===0)); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; if(!state.running) subLabel.textContent=subText(); }
 function bindSwitch(id,key,cb){ const el=$(id); el.classList.toggle('on',state.settings[key]); el.addEventListener('click',()=>{ state.settings[key]=!state.settings[key]; el.classList.toggle('on',state.settings[key]); cb&&cb(); save(); }); }
 bindSwitch('#swSound','sound',()=>{ if(state.settings.sound) previewTone(); }); bindSwitch('#swVibe','vibe');
-$('#stylePad').addEventListener('click',()=>{ state.settings.soundStyle='pad'; syncSoundStyle(); save(); previewTone(); });
-$('#styleBell').addEventListener('click',()=>{ state.settings.soundStyle='bell'; syncSoundStyle(); save(); previewTone(); });
-function syncSoundStyle(){ $('#stylePad').classList.toggle('on',state.settings.soundStyle==='pad'); $('#styleBell').classList.toggle('on',state.settings.soundStyle==='bell'); }
+function setStyle(s){ state.settings.soundStyle=s; syncSoundStyle(); save(); previewTone(); }
+$('#stylePad').addEventListener('click',()=>setStyle('pad'));
+$('#styleBell').addEventListener('click',()=>setStyle('bell'));
+$('#styleClick').addEventListener('click',()=>setStyle('click'));
+function syncSoundStyle(){ const s=state.settings.soundStyle; $('#stylePad').classList.toggle('on',s==='pad'); $('#styleBell').classList.toggle('on',s==='bell'); $('#styleClick').classList.toggle('on',s==='click'); }
 function previewTone(){ if(!state.settings.sound) return; ensureAudio(); glide(196,392,2.6); }
 $('#bgOff').addEventListener('click',()=>setBg('off'));
 $('#bgOcean').addEventListener('click',()=>setBg('ocean'));
@@ -564,6 +588,7 @@ function syncBg(){ $('#bgOff').classList.toggle('on',state.settings.bg==='off');
 $('#bgVolRange').addEventListener('input',e=>{ const v=+e.target.value; state.settings.bgVol=v/100; $('#bgVolVal').textContent=v; if(amb){ amb.vol=state.settings.bgVol; try{ const base=amb.kind==='drone'?0.17*amb.vol:0.12*amb.vol; amb.master.gain.linearRampToValueAtTime(Math.max(0.0001,base),audioCtx.currentTime+0.3); }catch(e){} } save(); }); bindSwitch('#swWake','wake',()=>{ if(!state.settings.wake) relWake(); else if(state.running) reqWake(); });
 bindSwitch('#swResNoLimit','resNoLimit',()=>{ $('#resDurField').classList.toggle('dim',state.settings.resNoLimit); if(!state.running) resetStatsLabels(); });
 bindSwitch('#swHrvNoLimit','hrvNoLimit',()=>{ $('#hrvDurField').classList.toggle('dim',state.settings.hrvNoLimit); });
+bindSwitch('#swBgCouple','bgCouple',()=>{ if(state.running){ ensureAudio(); stopAmbient(true); startAmbient(); } else previewBg(); });
 
 /* ---------- Persistence ---------- */
 function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
