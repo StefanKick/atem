@@ -99,6 +99,10 @@
   .h-card .l{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px; margin-top:2px;}
   .interpret{background:linear-gradient(180deg,#15304e,#132437); border:1px solid var(--line); border-radius:14px; padding:14px 16px; font-size:13.5px; line-height:1.6; margin-bottom:14px;}
   .interpret b{color:var(--teal);} .arrow-up{color:var(--good);} .arrow-dn{color:var(--warn);}
+  #readiness{border-radius:16px; padding:14px 16px; margin-bottom:14px; border:1px solid var(--line); display:flex; align-items:center; gap:14px;}
+  #readiness .rdot{width:40px; height:40px; border-radius:50%; flex:none; box-shadow:0 0 16px currentColor;}
+  #readiness .rt{font-size:16px; font-weight:700;}
+  #readiness .rs{font-size:12px; color:var(--dim); margin-top:3px; line-height:1.4;}
   .spark-box{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 12px; margin-bottom:10px;}
   .spark-box .t{font-size:12px; color:var(--dim); display:flex; justify-content:space-between; margin-bottom:6px;}
   .spark-box canvas{width:100%; height:56px; display:block;}
@@ -204,6 +208,7 @@
 
   <!-- History -->
   <div id="histView" class="hide">
+    <div id="readiness" class="hide"></div>
     <div class="h-cards">
       <div class="h-card"><div class="v" id="hcSessions">0</div><div class="l">Sitzungen</div></div>
       <div class="h-card"><div class="v" id="hcMinutes">0</div><div class="l">Minuten gesamt</div></div>
@@ -267,6 +272,11 @@
     <div class="toggle" style="border-top:none; padding-top:0;"><span>Training ohne Zeitlimit</span><div class="switch" id="swHrvNoLimit"></div></div>
     <div class="field" style="margin-top:8px;"><label>Ruhemessung-Dauer <b><span id="scanDurVal">3</span> Min</b></label><input type="range" id="scanDurRange" min="1" max="10" step="1" value="3"></div>
     <p class="hint">Für verlässliche Frequenz-Werte (LF/HF) mind. 3 Min messen.</p>
+    <div class="toggle" style="border-top:none; padding-top:0;"><span>Ruhemessung-Kreis</span>
+      <div class="seg" style="width:auto; flex:none; margin:0;"><button id="scanPulse" class="on" style="flex:none; padding:6px 14px;">Puls</button><button id="scanFree" style="flex:none; padding:6px 14px;">frei</button></div>
+    </div>
+    <p class="hint">„Puls": der Kreis folgt deinem echten Herzschlag (RSA) — Anker ohne Tempo-Vorgabe. „frei": nur ruhiger Punkt. Baseline bleibt ungeführt/vergleichbar.</p>
+    <button class="btn ghost sm" id="resTestBtn2" style="margin-top:6px;">🎯 Resonanz-Frequenz finden (~8 Min, Polar)</button>
   </div>
   <div class="toggle"><span>Ton</span><div class="switch on" id="swSound"></div></div>
   <div class="toggle" id="soundStyleRow"><span>Atem-Ton <small style="color:var(--dim)">(antippen zum Anhören)</small></span>
@@ -289,6 +299,13 @@
   <p class="hint" style="margin-bottom:8px;">Gekoppelt: die Brandung wächst beim Einatmen, ebbt beim Ausatmen. Entkoppelt: gleichmäßiger Klangteppich — dann markiert der Atem-Ton (z. B. „Klick") die Wechsel.</p>
   <div class="toggle"><span>Vibration</span><div class="switch on" id="swVibe"></div></div>
   <div class="toggle"><span>Bildschirm anlassen</span><div class="switch on" id="swWake"></div></div>
+  <div class="toggle"><span>Tägliche Erinnerungen</span><div class="switch" id="swRem"></div></div>
+  <div id="remFields" class="hide">
+    <div class="field" style="margin-top:6px;"><label>Morgens (Ruhemessung) <b><input type="time" id="remMorningInp" value="07:30" style="background:#12203a; border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:5px 8px; font-size:14px;"></b></label></div>
+    <div class="field"><label>Abends (Übung) <b><input type="time" id="remEveningInp" value="21:00" style="background:#12203a; border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:5px 8px; font-size:14px;"></b></label></div>
+    <button class="btn ghost sm" id="icsBtn">📅 In Kalender exportieren (zuverlässig)</button>
+    <p class="hint">Zuverlässige tägliche Erinnerungen laufen über deinen Kalender (Button). In-App-Benachrichtigungen erscheinen nur, solange die App geöffnet ist.</p>
+  </div>
   <button class="btn ghost" id="closeSheet" style="margin-top:16px;">Fertig</button>
 </div>
 
@@ -297,6 +314,8 @@
   <div class="res-head"><span class="ttl">Auswertung</span><button class="close" id="resClose">✕</button></div>
   <div class="res-body">
     <div class="res-sub" id="resSub"></div>
+    <div id="resTestView" class="hide"></div>
+    <div id="resStd">
     <div class="ring-wrap" id="ringWrap"><canvas id="ringCanvas" width="400" height="400"></canvas></div>
     <div class="res-cards" id="resCards"></div>
     <div id="zoneWrap"><div class="zonebars" id="zoneBars"></div><div class="coh-lbl" id="zoneLbl" style="margin-bottom:14px;"></div></div>
@@ -305,6 +324,7 @@
     <div class="sec-h">Alle HRV-Kennzahlen</div>
     <table class="mtable"><thead><tr><th>Kennzahl</th><th style="text-align:right">Wert</th><th style="text-align:right">Einordnung</th></tr></thead><tbody id="metricRows"></tbody></table>
     <p class="disclaimer" id="resDisclaimer"></p>
+    </div>
   </div>
 </div>
 
@@ -319,7 +339,8 @@
 const $ = s => document.querySelector(s);
 
 const DEF = { in:4, h1:0, out:6, h2:0, resDurMin:5, resNoLimit:false, hrvDurMin:5, hrvNoLimit:false,
-              scanDurMin:3, sighCount:4, sighMode:'count', sighDurMin:3, measure:false,
+              scanDurMin:3, sighCount:4, sighMode:'count', sighDurMin:3, measure:false, scanStyle:'pulse',
+              remOn:false, remMorning:'07:30', remEvening:'21:00',
               hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989 };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
@@ -482,12 +503,25 @@ function doneChime(){ chime(660,0.6); setTimeout(()=>chime(880,0.7),180); vibrat
 function startScan(){
   const durMs=state.settings.scanDurMin*60*1000, t0=performance.now();
   engine={timer:null,raf:null}; startRec('scan'); startAmbient();
-  phaseLabel.textContent='Ruhemessung'; subLabel.textContent='Ruhig sitzen, normal atmen — nicht sprechen';
-  setScale(orb,.7,2); setScale(orbCore,.6,2);
-  function tick(){ const el=performance.now()-t0, rem=Math.max(0,durMs-el); $('#hrvTime').textContent=fmt(rem);
-    // gentle calm pulse
-    const p=0.66+0.04*Math.sin(el/1400); orb.style.transition='transform .1s linear'; orb.style.transform=`scale(${p})`;
-    countNum.textContent=Math.ceil(rem/1000/60)+"'"; if(rem<=0){ finishHrv(el); return; } engine.raf=requestAnimationFrame(tick); }
+  const pulseMode = state.settings.scanStyle==='pulse';
+  phaseLabel.textContent='Ruhemessung'; subLabel.textContent = pulseMode? 'Ruhig sitzen — der Kreis folgt deinem Puls' : 'Ruhig sitzen, normal atmen — nicht sprechen';
+  setScale(orb,.7,2); setScale(orbCore,.6,2); orb.style.filter='brightness(1)';
+  function tick(){ const now=performance.now(), el=now-t0, rem=Math.max(0,durMs-el); $('#hrvTime').textContent=fmt(rem);
+    if(pulseMode && hrSeries.length>=4){
+      // Kreis nach echter Herzraten-Schwingung (RSA): steigt beim Einatmen, fällt beim Ausatmen
+      const win=hrSeries.filter(p=>now-p.t<=12000).map(p=>p.hr);
+      let lo=Math.min(...win), hi=Math.max(...win); if(hi-lo<3){ lo-=2; hi+=2; }
+      const cur=hrSeries[hrSeries.length-1].hr; const norm=Math.max(0,Math.min(1,(cur-lo)/(hi-lo)));
+      const scale=0.45+norm*0.55; orb.style.transition='transform .35s ease-out, filter .35s ease'; orb.style.transform=`scale(${scale.toFixed(3)})`;
+      const prev=hrSeries.find(p=>now-p.t>=1500); const rising = prev? cur>prev.hr : true;
+      orb.style.filter = rising? 'brightness(1.3) saturate(1.2)' : 'brightness(.8)';
+      phaseLabel.textContent = rising? 'Einatmen ↑' : 'Ausatmen ↓'; countNum.textContent='';
+    } else {
+      const p=0.66+0.04*Math.sin(el/1400); orb.style.transition='transform .1s linear'; orb.style.transform=`scale(${p})`;
+      phaseLabel.textContent = pulseMode? 'Warte auf Puls…' : 'Ruhemessung';
+      countNum.textContent=Math.ceil(rem/1000/60)+"'";
+    }
+    if(rem<=0){ finishHrv(el); return; } engine.raf=requestAnimationFrame(tick); }
   engine._meta={isHrv:true,scan:true,breaths:()=>0,elapsed:()=>performance.now()-t0};
   tick();
 }
@@ -512,6 +546,70 @@ function finishHrv(elapsedMs){
 }
 function adaptTarget(cohAvg){ let t=state.settings.hrvTarget; t=Math.round(0.7*t+0.3*cohAvg); t=Math.max(20,Math.min(90,t)); state.settings.hrvTarget=t; save(); }
 
+/* ---------- Resonanz-Frequenz-Assistent (Lehrer-Protokoll, Polar) ---------- */
+let resTest=null;
+const RES_RATES=[6.5,6.0,5.5,5.0,4.5]; const RES_STEP=100; // Sek/Rate
+function startResonanceTest(){
+  if(state.running||resTest) return;
+  if(!bleConnected()){ toast('Bitte zuerst Polar verbinden (HRV Live → Polar verbinden).'); return; }
+  ensureAudio(); reqWake(); startAmbient(); setRunning(true);
+  resTest={i:0,results:[],samples:[],stepStart:performance.now(),pTimer:null,rTimer:null}; runResStep();
+}
+function runResStep(){
+  if(!resTest) return;
+  if(resTest.i>=RES_RATES.length){ finishResonanceTest(); return; }
+  const bpm=RES_RATES[resTest.i], cyc=60/bpm, inS=Math.round(cyc*0.45*10)/10, outS=Math.round(cyc*0.55*10)/10;
+  resTest.samples=[]; resTest.stepStart=performance.now();
+  const seq=[{name:'Einatmen',dur:inS,scale:1.0,glide:[196,392],vibe:90},{name:'Ausatmen',dur:outS,scale:.30,glide:[392,196],vibe:[0,60]}];
+  let idx=0, phaseStart=performance.now();
+  function enter(k){ const ph=seq[k]; phaseStart=performance.now(); phaseLabel.textContent=phaseTitle(ph.name);
+    setScale(orb,ph.scale,ph.dur); setScale(orbCore,ph.scale===1.0?1.05:.45,ph.dur); orbCue(ph.name); if(ph.glide) glide(ph.glide[0],ph.glide[1],ph.dur); vibrate(ph.vibe); ambientPhase(ph);
+    resTest.pTimer=setTimeout(()=>{ idx=1-idx; enter(idx); }, ph.dur*1000); }
+  function tick(){ if(!resTest) return; const el=(performance.now()-resTest.stepStart)/1000;
+    if(el>25 && rsaAmp>0) resTest.samples.push(rsaAmp);
+    $('#hrvTime').textContent=fmt(Math.max(0,(RES_STEP-el)*1000));
+    subLabel.textContent=`Test ${resTest.i+1}/${RES_RATES.length} · ${bpm.toFixed(1)}/Min — ruhig folgen`;
+    if(el>=RES_STEP){ clearTimeout(resTest.pTimer);
+      const avg=resTest.samples.length?resTest.samples.reduce((a,b)=>a+b,0)/resTest.samples.length:0;
+      resTest.results.push({bpm,inS,outS,rsa:Math.round(avg*10)/10}); resTest.i++; runResStep(); return; }
+    resTest.rTimer=requestAnimationFrame(tick); }
+  enter(0); tick();
+}
+function stopResonanceTest(){ if(!resTest) return; clearTimeout(resTest.pTimer); cancelAnimationFrame(resTest.rTimer); resTest=null; stopAmbient(true); relWake(); setRunning(false); resetOrb(); phaseLabel.textContent='Bereit'; subLabel.textContent=subText(); }
+function finishResonanceTest(){
+  const res=(resTest&&resTest.results)?resTest.results.slice():[]; if(resTest){ clearTimeout(resTest.pTimer); cancelAnimationFrame(resTest.rTimer); } resTest=null;
+  stopAmbient(); relWake(); setRunning(false); resetOrb(); phaseLabel.textContent='Bereit'; doneChime();
+  const valid=res.filter(r=>r.rsa>0);
+  if(!valid.length){ subLabel.textContent='Kein Signal — Polar-Sitz prüfen.'; toast('Kein HRV-Signal erkannt.'); return; }
+  const best=valid.reduce((a,b)=>b.rsa>a.rsa?b:a);
+  state.settings.in=best.inS; state.settings.out=best.outS; state.settings.h1=0; state.settings.h2=0; save(); syncControls(); syncHint();
+  renderResTestResult(res,best); subLabel.textContent=subText();
+}
+function renderResTestResult(res,best){
+  const max=Math.max(...res.map(r=>r.rsa),1);
+  const rows=res.map(r=>{ const on=r===best; return `<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+    <div style="width:66px; font-size:13px; ${on?'color:var(--teal); font-weight:700':'color:var(--dim)'}">${r.bpm.toFixed(1)}/min</div>
+    <div style="flex:1; background:#0c1626; border-radius:6px; height:16px; overflow:hidden;"><div style="width:${Math.round(r.rsa/max*100)}%; height:100%; background:${on?'var(--good)':'#3a5a7a'}"></div></div>
+    <div style="width:56px; text-align:right; font-size:12px; ${on?'color:var(--teal)':'color:var(--dim)'}">${r.rsa}</div></div>`; }).join('');
+  $('#resSub').textContent='Resonanz-Frequenz-Test';
+  $('#resStd').classList.add('hide'); const v=$('#resTestView'); v.classList.remove('hide');
+  v.innerHTML=`<div class="interpret"><b>Deine Resonanzfrequenz: ${best.bpm.toFixed(1)} Atemzüge/Min</b> — hier schwingt dein Puls am stärksten (RSA ${best.rsa} bpm). Ich habe deine Resonanz-Atmung auf <b>${best.inS} Sek ein / ${best.outS} Sek aus</b> gesetzt.</div>
+    <div class="sec-h">Puls-Schwung (RSA) je Atemrate</div>${rows}
+    <p class="hint" style="margin-top:12px;">Je größer der Balken, desto stärker schwingt dein Puls bei dieser Rate — das ist deine optimale Trainingsfrequenz. Alle ~2–3 Monate wiederholen (schwankt mit Fitness/Tagesform).</p>`;
+  $('#result').classList.add('open');
+}
+
+/* ---------- Erinnerungen + Kalender-Export ---------- */
+let remTimers=[];
+function pad2(n){ return String(n).padStart(2,'0'); }
+function notify(msg){ try{ if('Notification' in window && Notification.permission==='granted') new Notification('Atem',{body:msg}); else toast(msg); }catch(e){ toast(msg); } }
+function scheduleReminders(){ remTimers.forEach(clearTimeout); remTimers=[]; if(!state.settings.remOn) return;
+  [['remMorning','Zeit für deine Ruhemessung 🩺'],['remEvening','Zeit für deine Atemübung 🫁']].forEach(([k,msg])=>{ const t=state.settings[k]; if(!t) return; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); const ms=d-new Date(); if(ms>0 && ms<24*3600*1000) remTimers.push(setTimeout(()=>notify(msg),ms)); }); }
+function exportIcs(){ const s=state.settings; const now=new Date(), y=now.getFullYear(), mo=pad2(now.getMonth()+1), da=pad2(now.getDate()); const stamp=`${y}${mo}${da}T000000`;
+  const ev=(uid,sum,hhmm)=>{ if(!hhmm) return ''; const [h,m]=hhmm.split(':'); return `BEGIN:VEVENT\r\nUID:${uid}-atem\r\nDTSTAMP:${stamp}\r\nDTSTART:${y}${mo}${da}T${pad2(+h)}${pad2(+m)}00\r\nRRULE:FREQ=DAILY\r\nSUMMARY:${sum}\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:PT0M\r\nDESCRIPTION:${sum}\r\nEND:VALARM\r\nEND:VEVENT\r\n`; };
+  const ics=`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Atem//DE\r\nCALSCALE:GREGORIAN\r\n${ev('morning','Atem: Ruhemessung 🩺',s.remMorning)}${ev('evening','Atem: Atemübung 🫁',s.remEvening)}END:VCALENDAR\r\n`;
+  const blob=new Blob([ics],{type:'text/calendar'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='atem-erinnerungen.ics'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000); toast('Kalender-Datei erstellt — öffnen/importieren für tägliche Erinnerungen.'); }
+
 /* ---------- Sigh ---------- */
 function startSigh(){
   const s=state.settings, byTime=s.sighMode==='time', n=s.sighCount, limitMs=s.sighDurMin*60*1000;
@@ -535,6 +633,7 @@ function setRunning(on){ state.running=on; const b=$('#startBtn'); b.textContent
 const startBtn=$('#startBtn');
 startBtn.addEventListener('click',()=>{
   ensureAudio();
+  if(resTest){ stopResonanceTest(); return; }
   if(state.running){
     const meta=engine&&engine._meta?{isHrv:engine._meta.isHrv,scan:engine._meta.scan,record:engine._meta.record,breaths:engine._meta.breaths(),elapsed:engine._meta.elapsed()}:null;
     stopEngine();
@@ -552,6 +651,7 @@ startBtn.addEventListener('click',()=>{
 /* ---------- Modes / tabs ---------- */
 function subText(){ const s=state.settings; if(state.mode==='resonance'){ const bpm=(60/(s.in+s.h1+s.out+s.h2)).toFixed(1); return `${s.in} Sek ein · ${s.out} Sek aus — ${bpm} Atemzüge/Min`; } if(state.mode==='sigh') return 'Doppel-Einatmung, langer Ausatem — 3–4× bei Seitenstechen'; if(state.mode==='hrv') return state.hrvSub==='scan'?'Ruhig sitzen — misst deine Baseline-HRV':'Start drücken, mit dem Kreis atmen'; return ''; }
 function switchMode(m){
+  if(resTest) stopResonanceTest();
   if(state.running){ stopEngine(); if(engine&&engine._meta&&engine._meta.isHrv) stopRec(); stopAmbient(true); relWake(); setRunning(false); }
   state.mode=m;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===m));
@@ -606,7 +706,7 @@ $('#sighModeCount').addEventListener('click',()=>{ state.settings.sighMode='coun
 $('#sighModeTime').addEventListener('click',()=>{ state.settings.sighMode='time'; syncSighMode(); save(); });
 function syncSighMode(){ const t=state.settings.sighMode==='time'; $('#sighModeCount').classList.toggle('on',!t); $('#sighModeTime').classList.toggle('on',t); $('#sighCountField').classList.toggle('hide',t); $('#sighDurField').classList.toggle('hide',!t); }
 document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{ state.settings.in=+c.dataset.in; state.settings.out=+c.dataset.out; state.settings.h1=0; state.settings.h2=0; syncControls(); syncHint(); }));
-function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#sighDurRange').value=s.sighDurMin; $('#sighDurVal').textContent=s.sighDurMin; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#swMeasure').classList.toggle('on',s.measure); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; syncSoundStyle(); syncBg(); syncSighMode(); $('#bgVolRange').value=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); $('#bgVolVal').textContent=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); subLabel.textContent=subText(); }
+function syncControls(){ const s=state.settings; $('#inRange').value=s.in; $('#inVal').textContent=s.in; $('#h1Range').value=s.h1; $('#h1Val').textContent=s.h1; $('#outRange').value=s.out; $('#outVal').textContent=s.out; $('#h2Range').value=s.h2; $('#h2Val').textContent=s.h2; $('#durRange').value=s.resDurMin; $('#durVal').textContent=s.resDurMin; $('#hrvDurRange').value=s.hrvDurMin; $('#hrvDurVal').textContent=s.hrvDurMin; $('#scanDurRange').value=s.scanDurMin; $('#scanDurVal').textContent=s.scanDurMin; $('#sighRange').value=s.sighCount; $('#sighVal').textContent=s.sighCount; $('#sighDurRange').value=s.sighDurMin; $('#sighDurVal').textContent=s.sighDurMin; $('#swResNoLimit').classList.toggle('on',s.resNoLimit); $('#swHrvNoLimit').classList.toggle('on',s.hrvNoLimit); $('#swMeasure').classList.toggle('on',s.measure); $('#resDurField').classList.toggle('dim',s.resNoLimit); $('#hrvDurField').classList.toggle('dim',s.hrvNoLimit); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; syncSoundStyle(); syncBg(); syncSighMode(); syncScanStyle(); $('#swRem').classList.toggle('on',s.remOn); $('#remFields').classList.toggle('hide',!s.remOn); $('#remMorningInp').value=s.remMorning; $('#remEveningInp').value=s.remEvening; $('#bgVolRange').value=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); $('#bgVolVal').textContent=Math.round((s.bgVol!=null?s.bgVol:0.5)*100); subLabel.textContent=subText(); }
 function syncHint(){ const s=state.settings, cyc=s.in+s.h1+s.out+s.h2, bpm=(60/cyc).toFixed(1); let msg=`≈ ${bpm} Atemzüge/Min.`; if(bpm>=4.5&&bpm<=7) msg+=' 👍 Im Resonanz-Bereich — ideal für die HRV.'; else if(bpm>7) msg+=' Tipp: Für maximale HRV langsamer (4,5–7/Min).'; $('#rateHint').textContent=msg; document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',+c.dataset.in===s.in&&+c.dataset.out===s.out&&s.h1===0&&s.h2===0)); $('#hrvRateEcho').textContent=`${s.in}–${s.out}`; if(!state.running) subLabel.textContent=subText(); }
 function bindSwitch(id,key,cb){ const el=$(id); el.classList.toggle('on',state.settings[key]); el.addEventListener('click',()=>{ state.settings[key]=!state.settings[key]; el.classList.toggle('on',state.settings[key]); cb&&cb(); save(); }); }
 bindSwitch('#swSound','sound',()=>{ if(state.settings.sound) previewTone(); }); bindSwitch('#swVibe','vibe');
@@ -626,6 +726,14 @@ bindSwitch('#swResNoLimit','resNoLimit',()=>{ $('#resDurField').classList.toggle
 bindSwitch('#swHrvNoLimit','hrvNoLimit',()=>{ $('#hrvDurField').classList.toggle('dim',state.settings.hrvNoLimit); });
 bindSwitch('#swBgCouple','bgCouple',()=>{ if(state.running){ ensureAudio(); stopAmbient(true); startAmbient(); } else previewBg(); });
 bindSwitch('#swMeasure','measure',()=>{ $('#hrvRow').classList.toggle('hide', !(state.mode==='hrv' || (state.settings.measure && state.mode==='resonance'))); });
+$('#scanPulse').addEventListener('click',()=>{ state.settings.scanStyle='pulse'; syncScanStyle(); save(); });
+$('#scanFree').addEventListener('click',()=>{ state.settings.scanStyle='free'; syncScanStyle(); save(); });
+function syncScanStyle(){ $('#scanPulse').classList.toggle('on',state.settings.scanStyle==='pulse'); $('#scanFree').classList.toggle('on',state.settings.scanStyle==='free'); }
+$('#resTestBtn2').addEventListener('click',()=>{ closeSheet(); if(state.mode!=='hrv') switchMode('hrv'); state.hrvSub='train'; applyHrvSub(); startResonanceTest(); });
+bindSwitch('#swRem','remOn',()=>{ $('#remFields').classList.toggle('hide',!state.settings.remOn); if(state.settings.remOn && 'Notification' in window && Notification.permission==='default'){ Notification.requestPermission(); } scheduleReminders(); });
+$('#remMorningInp').addEventListener('change',e=>{ state.settings.remMorning=e.target.value; save(); scheduleReminders(); });
+$('#remEveningInp').addEventListener('change',e=>{ state.settings.remEvening=e.target.value; save(); scheduleReminders(); });
+$('#icsBtn').addEventListener('click',exportIcs);
 
 /* ---------- Persistence ---------- */
 function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
@@ -732,6 +840,7 @@ function updateLiveInterpret(){ if(state.hrvSub==='scan') return; const el=$('#l
 function zonesFromCoh(serCoh,target){ const v=serCoh.filter(x=>x>0); if(!v.length) return {low:0,mid:0,high:0}; let lo=0,mi=0,hi=0; const a=target/3, b=2*target/3; v.forEach(x=>{ if(x<a) lo++; else if(x<b) mi++; else hi++; }); const n=v.length; return {low:Math.round(lo/n*100),mid:Math.round(mi/n*100),high:Math.round(hi/n*100)}; }
 
 function openResult(r){
+  $('#resStd').classList.remove('hide'); $('#resTestView').classList.add('hide');
   const isScan=r.mode==='scan';
   $('#resSub').textContent = `${isScan?'Ruhemessung':'HRV-Training'} · ${fmtDate(r.ts||Date.now())} · ${fmtM(r.dur)} · Qualität ${r.quality!=null?r.quality+'%':'–'}`;
   // ring + zones + cards (training only)
@@ -877,6 +986,7 @@ function renderHistory(){
   if(garmins.length){ const g=garmins[garmins.length-1]; $('#hcRmssd').textContent=(g.g7!=null?g.g7:Math.round(g.rmssd)); $('#hcRmssdLbl').textContent='Garmin 7-Tage HRV'; }
   else { const last5=scans.slice(-5); const avgR=last5.length?Math.round(last5.reduce((s,r)=>s+r.rmssd,0)/last5.length):null; $('#hcRmssd').textContent=avgR!=null?avgR:'–'; $('#hcRmssdLbl').textContent='Ø RMSSD Ruhe (5)'; }
   $('#histInterpret').innerHTML=buildInterpretation(h,scans,garmins);
+  renderReadiness(h);
   // trend selector
   $('#trendSeg').innerHTML=TRENDS.map((t,i)=>`<button class="${i===curTrend?'on':''}" data-i="${i}">${t.n}</button>`).join('');
   document.querySelectorAll('#trendSeg button').forEach(b=>b.addEventListener('click',()=>{ curTrend=+b.dataset.i; renderTrend(h); document.querySelectorAll('#trendSeg button').forEach(x=>x.classList.toggle('on',x===b)); }));
@@ -901,6 +1011,29 @@ function renderTrend(h){
   $('#sparkTitle').textContent=t.n;
   $('#sparkMeta').innerHTML = vals.length? (trendPct(vals)!=null?trendbadge(trendPct(vals)):`${vals.length} Messung(en)`) : 'keine Daten';
   drawSpark('#sparkMain', vals, t.src==='scan'?'#5fb0ff':(t.src==='garmin'?'#a9b8ff':'#7ee0c9'));
+}
+function computeReadiness(h){
+  const g=h.filter(r=>r.mode==='garmin'&&r.rmssd!=null);
+  if(g.length){ const last=g[g.length-1], v=last.rmssd, lo=last.baseLo, hi=last.baseHi; let color,title,sub;
+    if(lo&&hi){
+      if(v<lo){ color='var(--warn)'; title='Beansprucht — heute schonen'; sub=`Nacht-HRV ${Math.round(v)} ms unter deiner Baseline (${lo}–${hi}). Eher leicht: Resonanzatmung, Erholung.`; }
+      else if(v>hi){ color='var(--teal)'; title='Sehr erholt'; sub=`Nacht-HRV ${Math.round(v)} ms über deiner Baseline (${lo}–${hi}). Gute Reserven.`; }
+      else { color='var(--good)'; title='Ausgeglichen — bereit'; sub=`Nacht-HRV ${Math.round(v)} ms in deiner Baseline (${lo}–${hi}).`; }
+    } else { color='var(--good)'; title='Nacht-HRV erfasst'; sub=`${Math.round(v)} ms`; }
+    return {color,title,sub:`${sub} · ${fmtDate(last.ts)}`};
+  }
+  const s=h.filter(r=>r.mode==='scan'&&r.rmssd!=null);
+  if(s.length){ const last=s[s.length-1], v=last.rmssd; let color,title;
+    if(v<NORM.rmssd.lo){ color='var(--warn)'; title='HRV niedrig — heute schonen'; }
+    else if(v>NORM.rmssd.hi){ color='var(--teal)'; title='HRV hoch — sehr erholt'; }
+    else { color='var(--good)'; title='HRV im Normbereich'; }
+    return {color,title,sub:`Ruhe-RMSSD ${Math.round(v)} ms (Norm ${NORM.rmssd.lo}–${NORM.rmssd.hi}) · ${fmtDate(last.ts)}`};
+  }
+  return null;
+}
+function renderReadiness(h){ const r=computeReadiness(h), el=$('#readiness'); if(!r){ el.classList.add('hide'); return; }
+  el.classList.remove('hide'); el.style.background='linear-gradient(180deg,#15304e,#132437)';
+  el.innerHTML=`<div class="rdot" style="background:${r.color}; color:${r.color}"></div><div><div class="rt">Tagesform: ${r.title}</div><div class="rs">${r.sub}</div></div>`;
 }
 function buildInterpretation(h,scans,garmins){
   garmins=garmins||[];
@@ -987,7 +1120,7 @@ let toastT=null;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),4200); }
 
 /* ---------- Init ---------- */
-load(); syncControls(); syncHint(); resetStatsLabels(); resetOrb(); subLabel.textContent=subText();
+load(); syncControls(); syncHint(); resetStatsLabels(); resetOrb(); subLabel.textContent=subText(); scheduleReminders();
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 </script>
 </body>
