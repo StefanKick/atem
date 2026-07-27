@@ -29,8 +29,8 @@
   }
   header{padding:14px 18px 6px; text-align:center;}
   header h1{font-size:15px; font-weight:600; letter-spacing:3px; margin:0; color:var(--dim); text-transform:uppercase;}
-  .tabs{display:flex; gap:4px; padding:10px 10px 4px; justify-content:center;}
-  .tab{flex:1; max-width:90px; padding:9px 3px; border-radius:12px; text-align:center; background:transparent; color:var(--dim); font-size:11.5px; font-weight:600; border:1px solid transparent; cursor:pointer; transition:.2s;}
+  .tabs{display:flex; gap:3px; padding:10px 8px 4px; justify-content:center;}
+  .tab{flex:1; max-width:78px; padding:8px 2px; border-radius:11px; text-align:center; background:transparent; color:var(--dim); font-size:11px; font-weight:600; border:1px solid transparent; cursor:pointer; transition:.2s;}
   .tab.active{background:var(--card); color:var(--txt); border-color:var(--line); box-shadow:var(--shadow);}
   main{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; padding:8px 18px; overflow-y:auto;}
   main.top{justify-content:flex-start; padding-top:14px;}
@@ -169,12 +169,14 @@
   .pblock h3{font-size:14px; margin:0 0 4px; display:flex; justify-content:space-between; align-items:center; gap:8px;}
   .pblock .ptime{font-size:12px; color:var(--teal); font-variant-numeric:tabular-nums;}
   .pblock .pnow{font-size:10px; background:var(--teal-dim); color:#fff; padding:2px 8px; border-radius:10px; margin-right:6px;}
-  .pitem{display:flex; align-items:center; gap:12px; padding:9px 0; border-top:1px solid #1b2b45; cursor:pointer;}
+  .pgroup{font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin:20px 0 8px;}
+  .pgroup:first-child{margin-top:2px;}
+  .pitem{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-top:1px solid #1b2b45;}
   .pitem:first-of-type{border-top:none;}
-  .pcheck{width:24px; height:24px; border-radius:7px; border:2px solid var(--line); flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; color:#04141a;}
-  .pitem.done .pcheck{background:var(--teal); border-color:var(--teal);}
-  .pitem.done .pname{text-decoration:line-through; color:var(--dim);}
-  .pname{font-size:14px;} .pname small{display:block; color:var(--dim); font-size:11.5px; margin-top:1px;}
+  .pitem .pdot{color:var(--teal-dim); font-size:14px; flex:none; line-height:1.3;}
+  .pname{font-size:14px;} .pname small{color:var(--dim); font-size:12px;}
+  .pnote{font-size:12px; color:var(--dim); line-height:1.5; margin-top:8px; padding-top:8px; border-top:1px dashed #24384f;}
+  .pitem-info{font-size:13.5px; padding:5px 0; color:var(--txt);}
   #planText{width:100%; height:340px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:10px 12px; font-size:13px; font-family:ui-monospace,Menlo,monospace; line-height:1.5;}
   .hide{display:none !important;}
   .toast{position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:#1d2c44; border:1px solid var(--line); color:var(--txt); padding:12px 18px; border-radius:12px; font-size:13px; z-index:50; opacity:0; transition:.3s; max-width:88vw; text-align:center;}
@@ -185,7 +187,8 @@
 <header><h1 id="modeTitle">Resonanz-Atmung</h1></header>
 
 <div class="tabs">
-  <div class="tab active" data-mode="resonance">Atem</div>
+  <div class="tab active" data-mode="heute">Heute</div>
+  <div class="tab" data-mode="resonance">Atem</div>
   <div class="tab" data-mode="sigh">Seufzer</div>
   <div class="tab" data-mode="hrv">HRV</div>
   <div class="tab" data-mode="plan">Plan</div>
@@ -249,20 +252,25 @@
     <p class="disclaimer">Orientierungshilfe für dein Training — kein medizinisches Diagnosewerkzeug. Normwerte: Nunan 2010 / Shaffer &amp; Ginsberg 2017 (Ruhe, 5 Min). Bei gesundheitlichen Fragen ärztlichen Rat einholen.</p>
   </div>
 
-  <!-- Plan / Supplements -->
+  <!-- Heute Dashboard -->
+  <div id="todayView" class="hide">
+    <div id="todayGreet" style="font-size:15px; margin:2px 0 14px; text-align:center; color:var(--dim);"></div>
+    <div id="todayReadiness"></div>
+    <div class="pblock" id="todaySupp"></div>
+    <div class="pblock" id="todayAtem"></div>
+    <div class="pblock" id="todayHrv"></div>
+  </div>
+
+  <!-- Plan / Supplements (Info) -->
   <div id="planView" class="hide">
-    <div class="interpret" id="planAdherence"></div>
     <div id="planBlocks"></div>
-    <div class="row" style="margin-top:12px;">
-      <button class="btn ghost sm" id="planEditBtn">Plan bearbeiten</button>
-      <button class="btn ghost sm" id="planIcsBtn">📅 Erinnerungen (.ics)</button>
-    </div>
+    <button class="btn ghost sm" id="planEditBtn" style="margin-top:12px; max-width:460px;">Plan bearbeiten</button>
     <div id="planEditor" class="hide" style="margin-top:12px;">
       <textarea id="planText" spellcheck="false"></textarea>
-      <p class="hint">Format: Zeile <b>## Blockname HH:MM</b> = Zeitblock, darunter je Zeile <b>Mittel | Dosis</b>. Blöcke/Mittel frei änderbar.</p>
+      <p class="hint">Format: <b># Gruppe</b> (Überschrift) · <b>## Blockname HH:MM</b> (Zeitblock) · <b>Mittel | Dosis</b> (Zeile) · <b>&gt; Hinweis</b> (Einnahme-Notiz). Alles frei änderbar.</p>
       <div class="row"><button class="btn sm" id="planSave">Speichern</button><button class="btn ghost sm" id="planCancel">Abbrechen</button></div>
     </div>
-    <p class="disclaimer">Dein persönlicher Plan — keine medizinische Empfehlung. Dosierungen selbst prüfen bzw. mit Arzt/Therapeut abstimmen.</p>
+    <p class="disclaimer">Dein persönlicher Plan — nur zur Info, keine medizinische Empfehlung. Dosierungen mit Arzt/Therapeut abstimmen.</p>
   </div>
 </main>
 
@@ -375,15 +383,17 @@ const $ = s => document.querySelector(s);
 const DEF = { in:4, h1:0, out:6, h2:0, resDurMin:5, resNoLimit:false, hrvDurMin:5, hrvNoLimit:false,
               scanDurMin:3, sighCount:4, sighMode:'count', sighDurMin:3, measure:false, scanStyle:'pulse',
               remOn:false, remMorning:'07:30', remEvening:'21:00',
-              hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989,
-              planText:`## Nach dem Aufstehen 06:30
+              hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989, planVer:2,
+              planText:`# 🌅 Morgens
+## Nach dem Aufstehen 06:30
 Natriumselenit | 1 Kapsel 200 µg
 Mucoflora | 2 Kapseln
-MucoEffekt | 4 Kapseln
+MucoEffekt | 4 Kapseln (1 mehr)
 Colibiogen oral | 1 Teelöffel
 Mucoactiv | 1 Messlöffel
-EAA Pulver | 1 Messlöffel (in ~300 ml Wasser)
-## Frühstück 07:30
+EAA Pulver | 1 Messlöffel
+> Einnahme: Alles mit einem großen Glas Wasser. EAA-Pulver in ca. 300 ml Wasser shaken. (Nüchtern, ~30 Min vor dem Frühstück)
+## Zum Frühstück 07:30
 LaVita + Creatin | 1 Glas
 Magnesiumbisglycinat | 1 g (1/3 TL)
 NORSAN Omega-3 | 1 Esslöffel (+ opt. 1 EL Olivenöl)
@@ -393,13 +403,18 @@ Das Multi | 1 Kapsel
 Bio Ashwagandha | 2 Kapseln
 Mico-Cord (Cordyceps) | 4 Kapseln
 Zinkbisglycinat | 1 Kapsel (25 mg)
+> Einnahme: Magnesium in den Joghurt rühren. Den Rest zum Essen.
+# 🌆 Abends & Nachts
 ## Vor dem Abendessen 18:00
-MucoEffekt | 3 Kapseln
+MucoEffekt | 5 Kapseln (Rest für den Tag)
 Mucoactiv | 1 Messlöffel
+> Einnahme: Pulver in einem Glas Wasser auflösen und mit den Kapseln trinken. (~30 Min vor dem Essen)
 ## Zum Abendessen 18:30
 Bio Ashwagandha | 2 Kapseln
+Magnesiumbisglycinat | 1 g (1/3 TL)
 ## Vor dem Schlafengehen 22:00
-Magnesiumbisglycinat | 1 g (gegen Zähneknirschen)` };
+Magnesiumbisglycinat | 1 g (1/3 TL)
+> Einnahme: In einem halben Glas Wasser verrühren. Finale Dosis gegen das Zähneknirschen.` };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -713,9 +728,9 @@ function switchMode(m){
   if(state.running){ stopEngine(); if(engine&&engine._meta&&engine._meta.isHrv) stopRec(); stopAmbient(true); relWake(); setRunning(false); }
   state.mode=m;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===m));
-  const titles={resonance:'Resonanz-Atmung',sigh:'Physiological Sigh',hrv:'HRV Live-Biofeedback',history:'Verlauf & Fortschritt',plan:'Plan & Supplements'};
+  const titles={heute:'Heute',resonance:'Resonanz-Atmung',sigh:'Physiological Sigh',hrv:'HRV Live-Biofeedback',history:'Verlauf & Fortschritt',plan:'Plan & Supplements'};
   $('#modeTitle').textContent=titles[m];
-  const isHist=m==='history', isPlan=m==='plan', noBreath=isHist||isPlan;
+  const isHist=m==='history', isPlan=m==='plan', isToday=m==='heute', noBreath=isHist||isPlan||isToday;
   $('#orbWrap').classList.toggle('hide',noBreath);
   $('#phaseLabel').classList.toggle('hide',noBreath);
   $('#subLabel').classList.toggle('hide',noBreath);
@@ -723,6 +738,7 @@ function switchMode(m){
   $('#statsRow').classList.toggle('hide',m==='hrv'||noBreath);
   $('#histView').classList.toggle('hide',!isHist);
   $('#planView').classList.toggle('hide',!isPlan);
+  $('#todayView').classList.toggle('hide',!isToday);
   $('#hrvRow').classList.toggle('hide', !(m==='hrv' || (state.settings.measure && m==='resonance')));
   $('#controls').classList.toggle('hide',noBreath);
   $('#gearBtn').classList.toggle('hide',noBreath);
@@ -735,6 +751,7 @@ function switchMode(m){
   if(m==='hrv') applyHrvSub();
   if(isHist) renderHistory();
   if(isPlan) renderPlan();
+  if(isToday) renderToday();
 }
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchMode(t.dataset.mode)));
 function resetStatsLabels(){ document.querySelectorAll('#statsRow .l')[0].textContent='Restzeit'; document.querySelectorAll('#statsRow .l')[1].textContent='Atemzüge'; const s=state.settings; $('#statTime').textContent=s.resNoLimit?'0:00':fmt(s.resDurMin*60*1000); $('#statBreaths').textContent=0; }
@@ -797,7 +814,8 @@ $('#icsBtn').addEventListener('click',exportIcs);
 
 /* ---------- Persistence ---------- */
 function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
-function load(){ try{ const d=JSON.parse(localStorage.getItem('atem')); if(d) Object.assign(state.settings,d); }catch(e){} }
+function load(){ try{ const d=JSON.parse(localStorage.getItem('atem')); if(d) Object.assign(state.settings,d); }catch(e){}
+  if((state.settings.planVer||0) < DEF.planVer){ state.settings.planText=DEF.planText; state.settings.planVer=DEF.planVer; save(); } }
 
 /* ============================================================
    HRV METRIC ENGINE (time + frequency domain)
@@ -1173,36 +1191,48 @@ function suppDayKey(){ const d=new Date(); return d.getFullYear()+'-'+pad2(d.get
 function loadSupp(){ try{ return JSON.parse(localStorage.getItem('atem_supp'))||{}; }catch(e){ return {}; } }
 function saveSupp(s){ try{ localStorage.setItem('atem_supp',JSON.stringify(s)); }catch(e){} }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function parsePlan(text){ const blocks=[]; let cur=null;
+function parsePlan(text){ const blocks=[]; let cur=null, group='';
   (text||'').split(/\r?\n/).forEach(line=>{ const l=line.trim(); if(!l) return;
-    if(l.startsWith('##')){ const bm=l.match(/^##\s*(.*?)(?:\s+(\d{1,2}:\d{2}))?\s*$/); cur={name:(bm&&bm[1]?bm[1].trim():'Block'), time:(bm&&bm[2])?bm[2]:'', items:[]}; blocks.push(cur); return; }
-    if(!cur){ cur={name:'Allgemein', time:'', items:[]}; blocks.push(cur); }
+    if(l.startsWith('##')){ const bm=l.match(/^##\s*(.*?)(?:\s+(\d{1,2}:\d{2}))?\s*$/); cur={group, name:(bm&&bm[1]?bm[1].trim():'Block'), time:(bm&&bm[2])?bm[2]:'', items:[], note:''}; blocks.push(cur); return; }
+    if(l.startsWith('#')){ group=l.replace(/^#\s*/,'').trim(); return; }
+    if(l.startsWith('>')){ if(cur) cur.note=(cur.note?cur.note+' ':'')+l.replace(/^>\s*/,'').trim(); return; }
+    if(!cur){ cur={group, name:'', time:'', items:[], note:''}; blocks.push(cur); }
     const p=l.replace(/^[-•\s]+/,'').split('|'); cur.items.push({name:(p[0]||'').trim(), dose:(p[1]||'').trim()}); });
   return blocks; }
-function toggleSupp(key){ const s=loadSupp(), day=suppDayKey(); if(!s[day]) s[day]={}; if(s[day][key]) delete s[day][key]; else s[day][key]=1; saveSupp(s); renderPlan(); }
+function currentBlockIdx(blocks){ const d=new Date(), nowM=d.getHours()*60+d.getMinutes(); let ci=-1; blocks.forEach((b,i)=>{ if(b.time){ const [h,m]=b.time.split(':').map(Number); if(h*60+m<=nowM) ci=i; } }); return ci<0?(blocks.length?0:-1):ci; }
 function renderPlan(){
-  const blocks=parsePlan(state.settings.planText);
-  const d=new Date(), nowM=d.getHours()*60+d.getMinutes();
-  let curIdx=-1; blocks.forEach((b,i)=>{ if(b.time){ const [h,m]=b.time.split(':').map(Number); if(h*60+m<=nowM) curIdx=i; } });
-  if(curIdx<0) curIdx=0;
-  const taken=(loadSupp()[suppDayKey()])||{}; let total=0,done=0;
+  const blocks=parsePlan(state.settings.planText), ci=currentBlockIdx(blocks); let lastGroup=null;
   $('#planBlocks').innerHTML=blocks.map((b,i)=>{
-    const items=b.items.map((it,j)=>{ const key=`b${i}i${j}`, dn=!!taken[key]; total++; if(dn) done++;
-      return `<div class="pitem ${dn?'done':''}" data-k="${key}"><div class="pcheck">${dn?'✓':''}</div><div class="pname">${esc(it.name)}${it.dose?`<small>${esc(it.dose)}</small>`:''}</div></div>`; }).join('') || '<div class="pname" style="color:var(--dim);font-size:13px;padding:6px 0;">— keine Einträge —</div>';
-    return `<div class="pblock ${i===curIdx?'now':''}"><h3><span>${esc(b.name)}</span><span>${i===curIdx?'<span class="pnow">Jetzt</span>':''}<span class="ptime">${b.time||''}</span></span></h3>${items}</div>`;
+    let head=''; if(b.group && b.group!==lastGroup){ head=`<div class="pgroup">${esc(b.group)}</div>`; lastGroup=b.group; }
+    const items=b.items.map(it=>`<div class="pitem"><span class="pdot">•</span><div class="pname">${esc(it.name)}${it.dose?` <small>· ${esc(it.dose)}</small>`:''}</div></div>`).join('');
+    const note=b.note?`<div class="pnote">👉 ${esc(b.note)}</div>`:'';
+    return head+`<div class="pblock ${i===ci?'now':''}"><h3><span>${esc(b.name)}</span><span>${i===ci?'<span class="pnow">Jetzt</span>':''}<span class="ptime">${b.time||''}</span></span></h3>${items}${note}</div>`;
   }).join('');
-  $('#planAdherence').innerHTML=`<b>Heute:</b> ${done}/${total} genommen${total?` · ${Math.round(done/total*100)}%`:''}`;
-  document.querySelectorAll('#planBlocks .pitem').forEach(el=>el.addEventListener('click',()=>toggleSupp(el.dataset.k)));
+}
+function renderToday(){
+  const d=new Date(), h=d.getHours(), greet=h<11?'Guten Morgen':(h<18?'Guten Tag':'Guten Abend');
+  $('#todayGreet').innerHTML=`<b style="color:var(--txt)">${greet}.</b> ${d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})}`;
+  const r=computeReadiness(loadHist());
+  $('#todayReadiness').innerHTML = r
+    ? `<div id="readiness" style="background:linear-gradient(180deg,#15304e,#132437)"><div class="rdot" style="background:${r.color}; color:${r.color}"></div><div><div class="rt">Tagesform: ${r.title}</div><div class="rs">${r.sub}</div></div></div>`
+    : `<div class="interpret" style="margin-bottom:14px;">Noch keine HRV-Tagesform — mach eine <b>Ruhemessung</b> (HRV) oder importiere deine <b>Garmin-Nacht-HRV</b> im Verlauf.</div>`;
+  const blocks=parsePlan(state.settings.planText), ci=currentBlockIdx(blocks), cb=blocks[ci];
+  $('#todaySupp').innerHTML = cb ? `<h3><span>💊 Jetzt dran: ${esc(cb.name)}</span><span class="ptime">${cb.time||''}</span></h3>`
+      + cb.items.map(it=>`<div class="pitem-info">• ${esc(it.name)}${it.dose?` <span style="color:var(--dim)">· ${esc(it.dose)}</span>`:''}</div>`).join('')
+      + (cb.note?`<div class="pnote">👉 ${esc(cb.note)}</div>`:'')
+      + `<div style="margin-top:10px;"><a id="toPlan" style="color:var(--teal); cursor:pointer; font-size:13px;">Kompletter Plan →</a></div>` : '<div class="pitem-info" style="color:var(--dim)">Kein Plan hinterlegt.</div>';
+  const dk=dayKey(Date.now()), todays=loadHist().filter(x=>ACTIVE_MODES.includes(x.mode)&&dayKey(x.ts)===dk), mins=Math.round(todays.reduce((s,x)=>s+(x.dur||0),0)/60);
+  $('#todayAtem').innerHTML=`<h3><span>🫁 Atem heute</span></h3><div class="pitem-info">${todays.length?`✓ ${todays.length} Übung(en) · ${mins} Min`:'Noch keine Übung heute'}</div><div style="margin-top:10px;"><button class="btn sm" id="toAtem" style="max-width:240px;">Resonanz-Atmung starten</button></div>`;
+  const g=loadHist().filter(x=>x.mode==='garmin'&&x.rmssd!=null), sc=loadHist().filter(x=>x.mode==='scan'&&x.rmssd!=null); let hrvLine='Noch keine HRV-Daten.';
+  if(g.length){ const lg=g[g.length-1]; hrvLine=`Nacht-HRV ${Math.round(lg.rmssd)} ms${lg.g7!=null?` · 7-Tage-Ø ${lg.g7}`:''} <span style="color:var(--dim)">(${fmtDate(lg.ts)})</span>`; }
+  else if(sc.length){ const ls=sc[sc.length-1]; hrvLine=`Ruhe-RMSSD ${Math.round(ls.rmssd)} ms <span style="color:var(--dim)">(${fmtDate(ls.ts)})</span>`; }
+  $('#todayHrv').innerHTML=`<h3><span>💓 HRV</span></h3><div class="pitem-info">${hrvLine}</div>`;
+  const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
+  const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
 }
 $('#planEditBtn').addEventListener('click',()=>{ $('#planText').value=state.settings.planText; $('#planEditor').classList.remove('hide'); $('#planBlocks').classList.add('hide'); $('#planEditBtn').classList.add('hide'); });
 $('#planCancel').addEventListener('click',()=>{ $('#planEditor').classList.add('hide'); $('#planBlocks').classList.remove('hide'); $('#planEditBtn').classList.remove('hide'); });
 $('#planSave').addEventListener('click',()=>{ state.settings.planText=$('#planText').value; save(); $('#planEditor').classList.add('hide'); $('#planBlocks').classList.remove('hide'); $('#planEditBtn').classList.remove('hide'); renderPlan(); toast('Plan gespeichert.'); });
-$('#planIcsBtn').addEventListener('click',()=>{ const blocks=parsePlan(state.settings.planText).filter(b=>b.time); if(!blocks.length){ toast('Keine Uhrzeiten im Plan.'); return; }
-  const d=new Date(), y=d.getFullYear(), mo=pad2(d.getMonth()+1), da=pad2(d.getDate()), stamp=`${y}${mo}${da}T000000`;
-  const ev=(b,i)=>{ const [h,m]=b.time.split(':'); const sum=`Supplements: ${b.name}`; const desc=b.items.map(it=>it.name+(it.dose?` (${it.dose})`:'')).join(', ').replace(/[,;\\\r\n]/g,' ');
-    return `BEGIN:VEVENT\r\nUID:supp${i}-atem\r\nDTSTAMP:${stamp}\r\nDTSTART:${y}${mo}${da}T${pad2(+h)}${pad2(+m)}00\r\nRRULE:FREQ=DAILY\r\nSUMMARY:${sum}\r\nDESCRIPTION:${desc}\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:PT0M\r\nDESCRIPTION:${sum}\r\nEND:VALARM\r\nEND:VEVENT\r\n`; };
-  const ics=`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Atem//DE\r\nCALSCALE:GREGORIAN\r\n${blocks.map(ev).join('')}END:VCALENDAR\r\n`;
-  const blob=new Blob([ics],{type:'text/calendar'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='supplements-plan.ics'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000); toast('Plan als Kalender erstellt.'); });
 
 const GLOSSARY = `
 <p><b>Puls (bpm)</b> — Herzschläge/Min. Sinkt beim langsamen Ausatmen (gewollt).</p>
@@ -1220,7 +1250,7 @@ let toastT=null;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),4200); }
 
 /* ---------- Init ---------- */
-load(); syncControls(); syncHint(); resetStatsLabels(); resetOrb(); subLabel.textContent=subText(); scheduleReminders();
+load(); syncControls(); syncHint(); resetStatsLabels(); resetOrb(); subLabel.textContent=subText(); scheduleReminders(); switchMode('heute');
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 </script>
 </body>
