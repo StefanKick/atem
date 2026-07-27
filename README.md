@@ -13,10 +13,12 @@ via Web Bluetooth. Ersatz für die myQiu/BioSign-App (ohne Lizenz/Ablauf).
 
 | Tab | Funktion |
 |-----|----------|
-| **Resonanz** | Geführte Resonanzatmung (Default 4-6). Rate/Halte-Phasen frei einstellbar, flexible Dauer (1–45 Min oder ohne Zeitlimit). Atem-Orb + Ton + Vibration. |
-| **Seufzer** | Physiological Sigh (Doppel-Einatmung + langer Ausatem), Zyklen-Zähler. |
-| **HRV Live** | Polar verbinden → **Training** (paced Biofeedback: Kohärenz, adaptiver Zielwert, Übungserfolg) oder **Ruhemessung** (still sitzen → Baseline-HRV vs. Altersnorm). Nach der Sitzung: volle Auswertung. |
-| **Verlauf** | Jede Sitzung geloggt (localStorage). Summary, Interpretation, Trend pro Kennzahl, Tap-auf-Sitzung → Auswertung, Export/Import (JSON-Backup). |
+| **Heute** | Startseite/Dashboard: Tagesform-Ampel, aktuell fälliger Supplement-Block (zeitabhängig), Atem-Status heute + Start, letzter HRV-Wert. |
+| **Atem** (Resonanz) | Geführte Resonanzatmung (Default 4-6). Rate/Halte-Phasen frei einstellbar, flexible Dauer (1–45 Min oder ohne Zeitlimit). Atem-Orb + Ton + Vibration. Optional Polar-Mitmessen. Resonanz-Frequenz-Assistent. |
+| **Seufzer** | Physiological Sigh (Doppel-Einatmung + langer Ausatem), nach Anzahl oder Zeit. |
+| **HRV Live** | Polar verbinden → **Training** (paced Biofeedback: Kohärenz, adaptiver Zielwert, Übungserfolg) oder **Ruhemessung** (still sitzen, Puls-Kreis → Baseline-HRV vs. Altersnorm). Nach der Sitzung: volle Auswertung. |
+| **Plan** | Supplement-Plan (Info-only): Gruppen, Zeitblöcke mit „Jetzt"-Markierung, Mittel + Dosis + Einnahme-Hinweise. Editierbar. |
+| **Verlauf** | Jede Sitzung geloggt (localStorage) + Garmin-Nacht-HRV-Import. Summary, Interpretation, Trend pro Kennzahl, Tap-auf-Sitzung → Auswertung, Einträge löschbar, Export/Import (JSON-Backup). |
 
 **Auswertungs-Screen:** Ring-Gauge (Übungserfolg + Zonen), Zeit-im-Zielbereich, Puls+Kohärenz-Replay-Chart, volle HRV-Kennzahlentabelle mit Interpretation.
 
@@ -91,3 +93,9 @@ git add -A && git commit -m "..." && git push
 - **v8** Garmin Nacht-HRV Import (In-App-CSV, eigener Modus/Trend, persönliche Baseline) + Python-Tool
 - **v9** Resonanz-Frequenz-Assistent · Puls-Kreis (Ruhemessung) · Tagesform-Ampel · Erinnerungen (In-App + ICS) · Garmin Auto-Pull (Login) im Python-Tool
 - **v10** Einzelne Verlaufs-Einträge löschbar (Zeile + Auswertung)
+- **v11** Supplement-Plan (Tab) — tageszeit-abhängig, editierbar *(in v12 auf Info-only umgebaut)*
+- **v12** „Heute"-Dashboard als Startseite (Tagesform + fälliger Supp-Block + Atem-Status + HRV) · Supplement-Plan Info-only (Gruppen/Einnahme-Hinweise, keine Häkchen/Kalender) · voller Original-Plan mit planVer-Migration
+
+## Richtung: Gesundheits-Companion
+Die App wächst über Atmung/HRV hinaus zu einem täglichen Gesundheits-Cockpit. Tabs: **Heute** (Dashboard/Home) · Atem · Seufzer · HRV · Plan · Verlauf.
+Offene Roadmap: Körperdaten-Schnell-Log (Gewicht/Schlaf/Alkohol) mit HRV-Korrelation · Garmin um Schlaf/Ruhepuls/Body-Battery erweitern · Habit-Streaks.
