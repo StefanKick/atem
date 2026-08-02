@@ -177,6 +177,12 @@
   .pname{font-size:14px;} .pname small{color:var(--dim); font-size:12px;}
   .pnote{font-size:12px; color:var(--dim); line-height:1.5; margin-top:8px; padding-top:8px; border-top:1px dashed #24384f;}
   .pitem-info{font-size:13.5px; padding:5px 0; color:var(--txt);}
+  .ci-row{display:flex; align-items:center; gap:7px; margin:9px 0; flex-wrap:wrap;}
+  .ci-lbl{font-size:13px; color:var(--dim); width:84px; flex:none;}
+  .ci-chip{width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:#1d2c44; color:var(--dim); font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .ci-chip.on{background:var(--teal-dim); color:#fff; border-color:var(--teal);}
+  .ci-in{flex:1; min-width:130px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:7px 10px; font-size:13px;}
+  .ci-toggle{display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--txt); margin:9px 0;}
   #planText{width:100%; height:340px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:10px 12px; font-size:13px; font-family:ui-monospace,Menlo,monospace; line-height:1.5;}
   .hide{display:none !important;}
   .toast{position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:#1d2c44; border:1px solid var(--line); color:var(--txt); padding:12px 18px; border-radius:12px; font-size:13px; z-index:50; opacity:0; transition:.3s; max-width:88vw; text-align:center;}
@@ -260,6 +266,9 @@
     <div class="pblock" id="todaySupp"></div>
     <div class="pblock" id="todayAtem"></div>
     <div class="pblock" id="todayHrv"></div>
+    <div class="pblock" id="todayCheckin"></div>
+    <button class="btn ghost sm" id="ccExportBtn" style="margin-top:6px; max-width:460px;">🧠 An CC übergeben (Export)</button>
+    <p class="disclaimer">Alles bleibt lokal auf dem Gerät. „An CC übergeben" bündelt geflaggte Punkte + Kontext als Datei, die du mit Claude (Cowork/CC) besprichst.</p>
   </div>
 
   <!-- Plan / Supplements (Info) -->
@@ -532,7 +541,22 @@ function orbCue(name,secs){
   else if(name==='Ausatmen') orb.style.filter='brightness(.72) saturate(.9)';
   else orb.style.filter='brightness(1.0)';
 }
-function phaseTitle(name){ return name + (name==='Einatmen'?' ↑':(name==='Ausatmen'?' ↓':(name==='Nachziehen'?' ↑↑':''))); }
+/* Varianz: wechselnde Formulierungen je Sitzung */
+const CUES={
+  in:['Einatmen','Sanft einatmen','Langsam ein','Luft holen','Fülle dich','Durch die Nase ein','Weit werden','Ruhig ein'],
+  out:['Ausatmen','Lang ausatmen','Sanft aus','Loslassen','Sinken lassen','Durch den Mund aus','Ruhig aus','Alles raus'],
+  hold:['Halten','Ruhen','Innehalten','Kurz halten','Stille']
+};
+const DONE_MSGS=['gut gemacht','stark','schön ruhig geworden','fein','das tut dem Vagus gut','sauber durchgezogen','angekommen','wohltuend'];
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+let curCue=null;
+function pickCue(){ curCue={inW:pick(CUES.in), outW:pick(CUES.out), holdW:pick(CUES.hold)}; }
+function phaseTitle(name){ const c=curCue||{};
+  if(name==='Einatmen') return (c.inW||'Einatmen')+' ↑';
+  if(name==='Ausatmen') return (c.outW||'Ausatmen')+' ↓';
+  if(name==='Nachziehen') return 'Nachziehen ↑↑';
+  if(name==='Halten') return (c.holdW||'Halten');
+  return name; }
 function fmt(ms){ const s=Math.round(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function fmtM(sec){ const m=Math.floor(sec/60), s=sec%60; return m?`${m} Min`:`${s} Sek`; }
 
@@ -545,7 +569,7 @@ function buildSeq(){ const s=state.settings, seq=[]; seq.push({name:'Einatmen',d
 function bleConnected(){ return !!(bleDevice && bleDevice.gatt && bleDevice.gatt.connected); }
 
 function startBreathing(isHrv){
-  const s=state.settings, seq=buildSeq();
+  const s=state.settings, seq=buildSeq(); pickCue();
   // Resonanz kann optional mit Polar mitmessen → dann wie ein HRV-Training auswerten
   const recording = isHrv || (s.measure && bleConnected());
   const noLimit = isHrv ? s.hrvNoLimit : s.resNoLimit;
@@ -570,7 +594,7 @@ function startBreathing(isHrv){
   engine._meta={isHrv,scan:false,record:recording,breaths:()=>breaths,elapsed:()=>performance.now()-t0};
   enter(0); tick();
 }
-function finishResonance(breaths,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.30,2); setScale(orbCore,.45,2); orb.style.filter='brightness(1)'; logSession({mode:'resonance',dur:Math.round(elapsedMs/1000),breaths}); subLabel.textContent=`${breaths} Atemzüge · gespeichert ✓`; relWake(); setRunning(false); }
+function finishResonance(breaths,elapsedMs){ stopEngine(); stopAmbient(); doneChime(); phaseLabel.textContent='Fertig ✓'; countNum.textContent=''; setScale(orb,.30,2); setScale(orbCore,.45,2); orb.style.filter='brightness(1)'; logSession({mode:'resonance',dur:Math.round(elapsedMs/1000),breaths}); subLabel.textContent=`${breaths} Atemzüge · ${pick(DONE_MSGS)} ✓`; relWake(); setRunning(false); }
 function doneChime(){ chime(660,0.6); setTimeout(()=>chime(880,0.7),180); vibrate([120,80,120]); }
 
 /* ---------- Resting scan (no pacing) ---------- */
@@ -686,6 +710,7 @@ function exportIcs(){ const s=state.settings; const now=new Date(), y=now.getFul
 
 /* ---------- Sigh ---------- */
 function startSigh(){
+  pickCue();
   const s=state.settings, byTime=s.sighMode==='time', n=s.sighCount, limitMs=s.sighDurMin*60*1000;
   let cycle=0; const t0=performance.now(); engine={timer:null,raf:null};
   document.querySelectorAll('#statsRow .l')[0].textContent = byTime?'Restzeit':'Ziel';
@@ -1054,8 +1079,8 @@ function loadHist(){ try{ return JSON.parse(localStorage.getItem('atem_history')
 function saveHist(h){ try{ localStorage.setItem('atem_history', JSON.stringify(h)); }catch(e){ toast('Speichern fehlgeschlagen (Speicher voll?).'); } }
 function logSession(r){ const h=loadHist(); r.ts=Date.now(); h.push(r); if(h.length>3000) h.splice(0,h.length-3000); saveHist(h); }
 
-const MODE_META={resonance:{i:'🫁',n:'Resonanz'},sigh:{i:'🌬️',n:'Seufzer'},hrv:{i:'💓',n:'HRV Training'},scan:{i:'🩺',n:'Ruhemessung'},garmin:{i:'🌙',n:'Garmin Nacht-HRV'}};
-const ACTIVE_MODES=['resonance','sigh','hrv','scan']; // aktive Übungen (Garmin = passive Daten)
+const MODE_META={resonance:{i:'🫁',n:'Resonanz'},sigh:{i:'🌬️',n:'Seufzer'},hrv:{i:'💓',n:'HRV Training'},scan:{i:'🩺',n:'Ruhemessung'},garmin:{i:'🌙',n:'Garmin Nacht-HRV'},log:{i:'📝',n:'Tages-Check-in'},sleep:{i:'😴',n:'Schlaf (Garmin)'},activity:{i:'🚴',n:'Aktivität'}};
+const ACTIVE_MODES=['resonance','sigh','hrv','scan']; // aktive Übungen (Garmin/Log/Sleep = passive Daten)
 function fmtDate(ts){ const d=new Date(ts), now=new Date(); const sd=d.toDateString()===now.toDateString(); const yd=new Date(now); yd.setDate(now.getDate()-1); const iy=d.toDateString()===yd.toDateString(); const tm=d.toTimeString().slice(0,5); if(sd) return 'Heute '+tm; if(iy) return 'Gestern '+tm; return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+tm; }
 function dayKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); }
 function computeStreak(h){ if(!h.length) return 0; const days=new Set(h.map(r=>dayKey(r.ts))); let s=0; const d=new Date(); if(!days.has(dayKey(d.getTime()))){ d.setDate(d.getDate()-1); if(!days.has(dayKey(d.getTime()))) return 0; } while(days.has(dayKey(d.getTime()))){ s++; d.setDate(d.getDate()-1); } return s; }
@@ -1080,7 +1105,7 @@ function renderHistory(){
   document.querySelectorAll('#trendSeg button').forEach(b=>b.addEventListener('click',()=>{ curTrend=+b.dataset.i; renderTrend(h); document.querySelectorAll('#trendSeg button').forEach(x=>x.classList.toggle('on',x===b)); }));
   renderTrend(h);
   // Filter-Chips
-  const FILTERS=[['all','Alle'],['hrv','HRV'],['scan','Ruhe'],['garmin','Garmin'],['resonance','Atem'],['sigh','Seufzer']];
+  const FILTERS=[['all','Alle'],['log','Check-in'],['hrv','HRV'],['scan','Ruhe'],['garmin','Garmin'],['sleep','Schlaf'],['resonance','Atem'],['sigh','Seufzer']];
   $('#histFilter').innerHTML=FILTERS.map(([k,n])=>`<button class="${histFilter===k?'on':''}" data-f="${k}">${n}</button>`).join('');
   document.querySelectorAll('#histFilter button').forEach(b=>b.addEventListener('click',()=>{ histFilter=b.dataset.f; renderHistory(); }));
   // list (Original-Index bewahren für Öffnen/Löschen)
@@ -1092,7 +1117,11 @@ function renderHistory(){
     if(r.mode==='hrv') met=`<b>${r.success!=null?r.success+'%':'–'}</b> Erfolg${r.coh!=null?` · Koh ${r.coh}`:''}`;
     else if(r.mode==='scan') met=`<b>${r.rmssd!=null?Math.round(r.rmssd):'–'}</b> RMSSD${r.meanHR?` · ${Math.round(r.meanHR)}bpm`:''}`;
     else if(r.mode==='garmin') met=`<b>${Math.round(r.rmssd)}</b> ms Nacht${r.g7!=null?` · Ø7 ${r.g7}`:''}`;
-    else if(r.mode==='sigh') met=`<b>${r.cycles}</b> Seufzer`; else met=`<b>${r.breaths||0}</b> Atemzüge`;
+    else if(r.mode==='sigh') met=`<b>${r.cycles}</b> Seufzer`;
+    else if(r.mode==='log') met=`${r.flagCC?'🧠 ':''}${r.sleepScore?`Schlaf <b>${r.sleepScore}</b>`:''}${r.mood?` · Stimmung ${r.mood}`:''}`||'Check-in';
+    else if(r.mode==='sleep') met=`<b>${r.score!=null?r.score:'–'}</b> Score${r.hours?` · ${r.hours}h`:''}`;
+    else if(r.mode==='activity') met=`<b>${esc(r.name||'Aktivität')}</b>${r.dur?` · ${Math.round(r.dur/60)} Min`:''}`;
+    else met=`<b>${r.breaths||0}</b> Atemzüge`;
     const clickable=(r.mode==='hrv'||r.mode==='scan');
     return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${m.n}${r.mode==='garmin'?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
   }).join('');
@@ -1242,7 +1271,54 @@ function renderToday(){
   $('#todayHrv').innerHTML=`<h3><span>💓 HRV</span></h3><div class="pitem-info">${hrvLine}</div>`;
   const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
   const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
+  renderCheckin();
 }
+/* ---------- Tages-Check-in (Kontext-Log) ---------- */
+function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mode==='log'&&dayKey(r.ts)===dk)||null; }
+function ratingRow(label,key,val){ let c=''; for(let i=1;i<=5;i++) c+=`<div class="ci-chip ${val===i?'on':''}" data-ci="${key}" data-v="${i}">${i}</div>`; return `<div class="ci-row"><span class="ci-lbl">${label}</span>${c}</div>`; }
+function renderCheckin(){
+  const t=todayLog()||{};
+  $('#todayCheckin').innerHTML=`<h3><span>📝 Tages-Check-in</span><span class="ptime">${t.ts?'✓ heute':''}</span></h3>`
+   + ratingRow('Schlaf','sleepScore',t.sleepScore)
+   + ratingRow('Stimmung','mood',t.mood)
+   + `<div class="ci-row"><span class="ci-lbl">Alkohol</span><input class="ci-in" id="ciAlcohol" placeholder="z. B. 2 Bier / nein" value="${esc(t.alcohol||'')}"></div>`
+   + `<div class="ci-row"><span class="ci-lbl">Training</span><input class="ci-in" id="ciTraining" placeholder="z. B. 100 km Rad" value="${esc(t.training||'')}"></div>`
+   + `<div class="ci-row" style="align-items:flex-start"><span class="ci-lbl">Symptome</span><textarea class="ci-in" id="ciSymptoms" rows="2" placeholder="z. B. Verspannung linker unterer Nacken seit 3 Tagen">${esc(t.symptoms||'')}</textarea></div>`
+   + `<div class="ci-row" style="align-items:flex-start"><span class="ci-lbl">Notiz</span><textarea class="ci-in" id="ciNote" rows="2" placeholder="frei">${esc(t.note||'')}</textarea></div>`
+   + `<div class="ci-toggle"><span>🧠 Mit CC besprechen</span><div class="switch ${t.flagCC?'on':''}" id="ciFlag"></div></div>`
+   + `<button class="btn sm" id="ciSave" style="max-width:220px">Check-in speichern</button>`;
+  document.querySelectorAll('#todayCheckin .ci-chip').forEach(el=>el.addEventListener('click',()=>{ const sel=el.classList.contains('on'); document.querySelectorAll(`#todayCheckin .ci-chip[data-ci="${el.dataset.ci}"]`).forEach(x=>x.classList.remove('on')); if(!sel) el.classList.add('on'); }));
+  $('#ciFlag').addEventListener('click',()=>$('#ciFlag').classList.toggle('on'));
+  $('#ciSave').addEventListener('click',saveCheckin);
+}
+function saveCheckin(){
+  const getR=key=>{ const on=document.querySelector(`#todayCheckin .ci-chip[data-ci="${key}"].on`); return on?+on.dataset.v:null; };
+  const rec={ sleepScore:getR('sleepScore'), mood:getR('mood'), alcohol:$('#ciAlcohol').value.trim(), training:$('#ciTraining').value.trim(), symptoms:$('#ciSymptoms').value.trim(), note:$('#ciNote').value.trim(), flagCC:$('#ciFlag').classList.contains('on') };
+  const h=loadHist(), dk=dayKey(Date.now()), ex=h.find(r=>r.mode==='log'&&dayKey(r.ts)===dk);
+  if(ex){ Object.assign(ex,rec); } else { h.push({ts:Date.now(),mode:'log',...rec}); }
+  saveHist(h); renderToday(); toast('Check-in gespeichert.');
+}
+function exportCC(){
+  const h=loadHist(), now=Date.now(), weekAgo=now-7*86400000;
+  const logs=h.filter(r=>r.mode==='log'), flagged=logs.filter(r=>r.flagCC);
+  const recentLogs=logs.filter(r=>r.ts>=weekAgo).sort((a,b)=>a.ts-b.ts);
+  const garmin=h.filter(r=>r.mode==='garmin'&&r.rmssd!=null).slice(-7);
+  const scans=h.filter(r=>r.mode==='scan'&&r.rmssd!=null).slice(-5);
+  let md=`# Atem-App → CC Übergabe (${new Date().toLocaleString('de-DE')})\n\n`;
+  if(flagged.length){ md+=`## 🧠 Zur Besprechung geflaggt\n`; flagged.forEach(r=>{ md+=`- ${fmtDate(r.ts)}: ${r.symptoms||r.note||'(ohne Text)'}\n`; }); md+='\n'; }
+  md+=`## Kontext letzte 7 Tage (Check-ins)\n`;
+  if(recentLogs.length) recentLogs.forEach(r=>{ md+=`- ${fmtDate(r.ts)}: Schlaf ${r.sleepScore||'–'}, Stimmung ${r.mood||'–'}${r.alcohol?`, Alkohol: ${r.alcohol}`:''}${r.training?`, Training: ${r.training}`:''}${r.symptoms?`, Symptome: ${r.symptoms}`:''}${r.note?`, Notiz: ${r.note}`:''}\n`; });
+  else md+=`- (keine Check-ins)\n`;
+  md+=`\n## HRV\n`;
+  if(garmin.length) md+=`Garmin Nacht-HRV (letzte): ${garmin.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
+  if(scans.length) md+=`Ruhemessung RMSSD (letzte): ${scans.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
+  if(!garmin.length&&!scans.length) md+=`(keine HRV-Daten)\n`;
+  md+=`\n_Bitte im Licht meines Gesundheitsprofils (PROFIL-STEFAN.md) auswerten und das Profil ggf. ergänzen._\n`;
+  try{ if(navigator.clipboard) navigator.clipboard.writeText(md); }catch(e){}
+  const blob=new Blob([md],{type:'text/markdown'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`atem-cc-uebergabe-${new Date().toISOString().slice(0,10)}.md`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast('Export erstellt (auch in Zwischenablage).');
+}
+$('#ccExportBtn').addEventListener('click',exportCC);
 $('#planEditBtn').addEventListener('click',()=>{ $('#planText').value=state.settings.planText; $('#planEditor').classList.remove('hide'); $('#planBlocks').classList.add('hide'); $('#planEditBtn').classList.add('hide'); });
 $('#planCancel').addEventListener('click',()=>{ $('#planEditor').classList.add('hide'); $('#planBlocks').classList.remove('hide'); $('#planEditBtn').classList.remove('hide'); });
 $('#planSave').addEventListener('click',()=>{ state.settings.planText=$('#planText').value; save(); $('#planEditor').classList.add('hide'); $('#planBlocks').classList.remove('hide'); $('#planEditBtn').classList.remove('hide'); renderPlan(); toast('Plan gespeichert.'); });
