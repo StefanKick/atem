@@ -9,8 +9,10 @@ Zwei Modi:
        export GARMIN_EMAIL="du@example.com"
        export GARMIN_PASSWORD="dein-passwort"
        python3 garmin_hrv_to_atem.py --fetch --days 28 -o ~/Library/Mobile\ Documents/com~apple~CloudDocs/atem-garmin.json
-     → Zieht die nächtliche HRV der letzten N Tage. Token wird in
-       ~/.garminconnect gecacht (Login/MFA nur beim ersten Mal).
+     → Zieht der letzten N Tage: **Nacht-HRV + Ruhepuls** (mode garmin),
+       **Sleep Score + Schlafdauer** (mode sleep) und **Aktivitäten** inkl.
+       Rennrad-Fahrten (mode activity). Token in ~/.garminconnect gecacht
+       (Login/MFA nur beim ersten Mal). Import in der App wie gehabt.
 
   B) CSV → JSON (kein Login, aus Garmin-Connect-Export):
        python3 garmin_hrv_to_atem.py HFV-Status.csv -o atem-garmin.json
@@ -46,6 +48,9 @@ def _dig(d, *keys, default=None):
             return d[k]
     return default
 
+def _ts_at(d, hh, mm):
+    return int(datetime(d.year, d.month, d.day, hh, mm, 0).timestamp() * 1000)
+
 def fetch_from_garmin(days, email, password):
     from garminconnect import Garmin
     tokenstore = os.path.expanduser("~/.garminconnect")
@@ -59,21 +64,58 @@ def fetch_from_garmin(days, email, password):
     for i in range(days):
         d = (date.today() - timedelta(days=i))
         ds = d.isoformat()
+        # --- Nacht-HRV (07:00) ---
         try:
             data = client.get_hrv_data(ds)
+            summ = _dig(data or {}, "hrvSummary", default={}) or {}
+            val = _dig(summ, "lastNightAvg", "lastNight5MinHigh", "weeklyAvg")
+            if val is not None:
+                base = _dig(summ, "baseline", default={}) or {}
+                e = _entry(_ts(d.year, d.month, d.day), _num(val),
+                           g7=_num(_dig(summ, "weeklyAvg")),
+                           lo=_num(_dig(base, "balancedLow", "lowUpper")),
+                           hi=_num(_dig(base, "balancedUpper", "markerValue")))
+                # Ruhepuls dranhaengen (defensiv aus mehreren Quellen)
+                try:
+                    st = client.get_stats(ds) or {}
+                    e["rhr"] = _num(_dig(st, "restingHeartRate"))
+                except Exception:
+                    pass
+                out.append(e)
         except Exception:
-            continue
-        if not data:
-            continue
-        summ = _dig(data, "hrvSummary", default={}) or {}
-        val = _dig(summ, "lastNightAvg", "lastNight5MinHigh", "weeklyAvg")
-        if val is None:
-            continue
-        base = _dig(summ, "baseline", default={}) or {}
-        lo = _dig(base, "balancedLow", "lowUpper")
-        hi = _dig(base, "balancedUpper", "markerValue")
-        out.append(_entry(_ts(d.year, d.month, d.day), _num(val),
-                          g7=_num(_dig(summ, "weeklyAvg")), lo=_num(lo), hi=_num(hi)))
+            pass
+        # --- Schlaf (07:05) ---
+        try:
+            sd = client.get_sleep_data(ds) or {}
+            dto = _dig(sd, "dailySleepDTO", default={}) or {}
+            scores = _dig(dto, "sleepScores", default={}) or {}
+            score = _dig(_dig(scores, "overall", default={}) or {}, "value") or _dig(dto, "sleepScoreValue")
+            secs = _dig(dto, "sleepTimeSeconds")
+            if score is not None or secs is not None:
+                out.append({"ts": _ts_at(d, 7, 5), "mode": "sleep", "src": "garmin",
+                            "score": _num(score),
+                            "hours": round(_num(secs) / 3600, 1) if secs else None,
+                            "dur": int(_num(secs)) if secs else 0})
+        except Exception:
+            pass
+    # --- Aktivitaeten (echte Startzeit) ---
+    try:
+        acts = client.get_activities_by_date(
+            (date.today() - timedelta(days=days)).isoformat(), date.today().isoformat()) or []
+        for a in acts:
+            start = _dig(a, "startTimeLocal", "startTimeGMT")
+            if not start:
+                continue
+            try:
+                ts = int(datetime.fromisoformat(str(start).replace(" ", "T")).timestamp() * 1000)
+            except Exception:
+                continue
+            out.append({"ts": ts, "mode": "activity", "src": "garmin",
+                        "name": _dig(_dig(a, "activityType", default={}) or {}, "typeKey") or a.get("activityName") or "Aktivität",
+                        "dur": int(_num(_dig(a, "duration")) or 0),
+                        "distance": _num(_dig(a, "distance"))})
+    except Exception:
+        pass
     out.sort(key=lambda e: e["ts"])
     return out
 
@@ -133,7 +175,7 @@ def main():
 
     if not entries:
         print("Keine Garmin-Daten erkannt.", file=sys.stderr); sys.exit(1)
-    doc = {"app": "atem", "version": 9,
+    doc = {"app": "atem", "version": 14,
            "exported": datetime.now().isoformat(timespec="seconds"), "history": entries}
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, indent=2)
