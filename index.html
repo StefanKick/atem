@@ -239,6 +239,7 @@
     <div class="trend-seg" id="trendSeg"></div>
     <div class="spark-box" id="sparkBox"><div class="t"><span id="sparkTitle">Trend</span><span id="sparkMeta"></span></div><canvas id="sparkMain"></canvas></div>
     <div class="sec-h">Sitzungen (tippen für Auswertung)</div>
+    <div class="trend-seg" id="histFilter"></div>
     <div class="h-list" id="histList"></div>
     <div class="row" style="margin-top:12px;">
       <button class="btn ghost sm" id="exportBtn">Backup exportieren</button>
@@ -715,6 +716,12 @@ startBtn.addEventListener('click',()=>{
       else if(state.mode==='resonance' && meta.elapsed>15000){ logSession({mode:'resonance',dur:Math.round(meta.elapsed/1000),breaths:meta.breaths}); } }
     stopAmbient(); relWake(); resetOrb(); phaseLabel.textContent='Bereit'; subLabel.textContent=subText(); setRunning(false); return;
   }
+  // ⚠️ Polar-Warnung: HRV-Modi (oder Resonanz mit Mitmessen) ohne verbundenen Gurt
+  if(state.mode==='hrv' && !bleConnected()){
+    if(!confirm('⚠️ Kein Polar-Gurt verbunden.\n\nOhne Gurt werden KEINE HRV-Werte erfasst — die Sitzung liefert keine Auswertung.\n\nTrotzdem ohne Messung starten?')) return;
+  } else if(state.mode==='resonance' && state.settings.measure && !bleConnected()){
+    if(!confirm('⚠️ „HRV mitmessen" ist aktiv, aber kein Polar verbunden.\n\nEs werden keine Werte erfasst. Trotzdem starten?')) return;
+  }
   resetOrb(); reqWake(); setRunning(true);
   if(state.mode==='resonance'){ $('#statBreaths').textContent=0; startBreathing(false); }
   else if(state.mode==='sigh'){ startSigh(); }
@@ -1056,7 +1063,7 @@ function trendPct(vals){ if(vals.length<4) return null; const mid=Math.floor(val
 function trendbadge(p){ if(p==null) return ''; if(p>2) return `<span class="arrow-up">▲ +${p}%</span>`; if(p<-2) return `<span class="arrow-dn">▼ ${p}%</span>`; return `<span style="color:var(--dim)">≈ stabil</span>`; }
 
 const TRENDS=[ {k:'rmssd',n:'HRV Nacht (Garmin)',src:'garmin'}, {k:'success',n:'Übungserfolg',src:'hrv',fmt:v=>v+'%'}, {k:'coh',n:'Kohärenz',src:'hrv'}, {k:'rmssd',n:'RMSSD (Ruhe)',src:'scan'}, {k:'sdnn',n:'SDNN (Ruhe)',src:'scan'}, {k:'rmssd',n:'RMSSD (Training)',src:'hrv',id:'rmssd_tr'}, {k:'lfhf',n:'LF/HF (Ruhe)',src:'scan'} ];
-let curTrend=0;
+let curTrend=0, histFilter='all';
 function renderHistory(){
   const h=loadHist();
   const active=h.filter(r=>ACTIVE_MODES.includes(r.mode));
@@ -1072,10 +1079,16 @@ function renderHistory(){
   $('#trendSeg').innerHTML=TRENDS.map((t,i)=>`<button class="${i===curTrend?'on':''}" data-i="${i}">${t.n}</button>`).join('');
   document.querySelectorAll('#trendSeg button').forEach(b=>b.addEventListener('click',()=>{ curTrend=+b.dataset.i; renderTrend(h); document.querySelectorAll('#trendSeg button').forEach(x=>x.classList.toggle('on',x===b)); }));
   renderTrend(h);
-  // list
+  // Filter-Chips
+  const FILTERS=[['all','Alle'],['hrv','HRV'],['scan','Ruhe'],['garmin','Garmin'],['resonance','Atem'],['sigh','Seufzer']];
+  $('#histFilter').innerHTML=FILTERS.map(([k,n])=>`<button class="${histFilter===k?'on':''}" data-f="${k}">${n}</button>`).join('');
+  document.querySelectorAll('#histFilter button').forEach(b=>b.addEventListener('click',()=>{ histFilter=b.dataset.f; renderHistory(); }));
+  // list (Original-Index bewahren für Öffnen/Löschen)
   const list=$('#histList');
-  if(!h.length){ list.innerHTML='<div class="empty">Noch keine Sitzungen.<br>Starte eine Übung — sie erscheint hier automatisch.</div>'; return; }
-  list.innerHTML = h.slice().reverse().slice(0,80).map((r,i)=>{ const idx=h.length-1-i; const m=MODE_META[r.mode]||{i:'•',n:r.mode}; let met='';
+  if(!h.length){ list.innerHTML='<div class="empty">Noch keine Sitzungen.<br>Starte eine Übung — sie erscheint hier automatisch.</div>'; $('#glossaryBody').innerHTML=GLOSSARY; return; }
+  const rows=h.map((r,idx)=>({r,idx})).reverse().filter(o=>histFilter==='all'||o.r.mode===histFilter).slice(0,150);
+  if(!rows.length){ list.innerHTML='<div class="empty">Keine Einträge in diesem Filter.</div>'; $('#glossaryBody').innerHTML=GLOSSARY; return; }
+  list.innerHTML = rows.map(({r,idx})=>{ const m=MODE_META[r.mode]||{i:'•',n:r.mode}; let met='';
     if(r.mode==='hrv') met=`<b>${r.success!=null?r.success+'%':'–'}</b> Erfolg${r.coh!=null?` · Koh ${r.coh}`:''}`;
     else if(r.mode==='scan') met=`<b>${r.rmssd!=null?Math.round(r.rmssd):'–'}</b> RMSSD${r.meanHR?` · ${Math.round(r.meanHR)}bpm`:''}`;
     else if(r.mode==='garmin') met=`<b>${Math.round(r.rmssd)}</b> ms Nacht${r.g7!=null?` · Ø7 ${r.g7}`:''}`;
