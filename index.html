@@ -212,6 +212,22 @@
   .mk i{color:var(--dim); font-style:normal;}
   .au-foot{margin-top:9px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
   .btn.xs{font-size:12px; padding:5px 11px; max-width:200px;}
+  /* Laborwerte */
+  .lab-grp{font-size:11px; color:var(--teal); text-transform:uppercase; letter-spacing:.5px; margin:14px 0 2px;}
+  .lab-row{display:flex; align-items:baseline; gap:8px; padding:5px 0; border-top:1px solid #1b2b45; font-size:13px;}
+  .lab-n{flex:1;}
+  .lab-v{flex:0 0 56px; text-align:right; font-weight:600; font-variant-numeric:tabular-nums;}
+  .lab-ar{flex:0 0 84px; font-size:12px;}
+  .lab-ar small{color:var(--dim);}
+  .lab-ref{flex:0 0 78px; text-align:right; color:var(--dim); font-size:12px;}
+  .lab-meta{margin-top:10px; font-size:12px; color:var(--dim);}
+  .lab-in{max-width:120px;}
+  /* Insights */
+  .ins-row{display:flex; gap:10px; padding:7px 0; border-top:1px solid #1b2b45;}
+  .ins-i{flex:0 0 22px; font-size:16px;}
+  .ins-t{font-size:14px; font-weight:600;}
+  .ins-d{font-size:12px; color:var(--dim); margin-top:1px;}
+  .ins-warn .ins-t{color:#e0b063;}
   .rm-item{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-top:1px solid #1b2b45;}
   .rm-item:first-of-type{border-top:none;}
   .rm-when{font-size:12px; font-weight:700; flex:none; width:96px;}
@@ -296,10 +312,12 @@
   <div id="todayView" class="hide">
     <div id="todayGreet" style="font-size:15px; margin:2px 0 14px; text-align:center; color:var(--dim);"></div>
     <div id="todayReadiness"></div>
+    <div class="pblock hide" id="todayInsights"></div>
     <div class="pblock" id="todaySupp"></div>
     <div class="pblock hide" id="todayAudit"></div>
     <div class="pblock" id="todayAtem"></div>
     <div class="pblock" id="todayHrv"></div>
+    <div class="pblock" id="todayTraining"></div>
     <div class="pblock" id="todayMobility"></div>
     <div id="mobilityEditor" class="hide" style="margin-bottom:14px;">
       <textarea id="mobilityText" class="editta" spellcheck="false" style="height:180px"></textarea>
@@ -323,6 +341,16 @@
     <div class="sec-h" style="margin-top:24px;">🔍 Supplement-Check</div>
     <p class="hint" style="margin:-4px 0 10px;">Jedes Präparat mit Zielwert/-symptom, Kontrolldatum und Abbruchkriterium. Fehlt Marker <b>und</b> Ziel → Streich-Kandidat.</p>
     <div id="planAudit"></div>
+    <div class="sec-h" style="margin-top:24px;">🧪 Laborwerte</div>
+    <p class="hint" style="margin:-4px 0 10px;">Trend über die Zeit. Baseline = Eurofins 04/2026. Nach jeder Blutabnahme neue Werte eintragen — die überfälligen Kontrollen im Supplement-Check lösen sich damit auf.</p>
+    <div id="labList"></div>
+    <button class="btn ghost sm" id="labAddBtn" style="margin-top:10px; max-width:460px;">+ Neue Werte eintragen</button>
+    <div id="labEditor" class="hide" style="margin-top:12px;">
+      <div class="row" style="margin-bottom:8px;"><span class="ci-lbl" style="flex:0 0 90px;">Datum</span><input class="ci-in" id="labDate" type="date"></div>
+      <div class="row" style="margin-bottom:8px;"><span class="ci-lbl" style="flex:0 0 90px;">Labor</span><input class="ci-in" id="labSrc" placeholder="z. B. Hausarzt 08/2026"></div>
+      <div id="labInputs"></div>
+      <div class="row" style="margin-top:8px;"><button class="btn sm" id="labSave">Speichern</button><button class="btn ghost sm" id="labCancel">Abbrechen</button></div>
+    </div>
     <div class="sec-h" style="margin-top:24px;">🍽️ Ernährung</div>
     <div id="nutritionBlocks"></div>
     <button class="btn ghost sm" id="nutriEditBtn" style="margin-top:12px; max-width:460px;">Ernährung bearbeiten</button>
@@ -505,7 +533,7 @@ Schulterblätter zusammenziehen | Rudern, gegen den Rundrücken
 Mikropause | alle 30–60 Min: Chin Tuck + Schultern kreisen
 Kiefer locker | tagsüber "Zähne locker, Zunge am Gaumen"
 FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahnschutz)`,
-  auditVer:1, auditDone:{},
+  auditVer:1, auditDone:{}, labsVer:1, labHistory:[],
   audit:[
     {key:'darm', name:'Darm-Aufbau (Muco-Reihe + Colibiogen)', dose:'morgens nüchtern + abends',
      markers:[{n:'sIgA',v:'<168',ref:'510–2040',st:'low'},{n:'Shannon',v:'3,8',ref:'reduziert',st:'low'},{n:'Elastase',v:'117',ref:'>200, konfundiert',st:'low'}],
@@ -551,6 +579,38 @@ FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahns
      note:'Kein persönlicher Marker — allgemein gut belegt, Stufe-6-Kernstack-Kandidat. Zielsymptom eintragen oder als Basis akzeptieren.'}
   ] };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
+
+/* ---------- Laborwerte-Modell (Referenzen aus Profil 04/2026) ---------- */
+const LAB_MARKERS = [
+  {k:'plp', n:'B6 (PLP)', ref:'20–40', dir:'lower', base:84.6, grp:'Sicherheit'},
+  {k:'aaepa', n:'AA:EPA', ref:'<3', dir:'lower', base:9.6, grp:'Entzündung'},
+  {k:'aa', n:'Arachidonsäure', ref:'185–335', dir:'lower', base:363, grp:'Entzündung'},
+  {k:'vite', n:'Vitamin E', ref:'12–20', dir:'higher', base:11.72, grp:'Entzündung'},
+  {k:'vitd', n:'Vitamin D (25-OH)', ref:'30–70', dir:'range', base:49, grp:'Vitamine/Mineralien'},
+  {k:'k2', n:'K2-MK7', ref:'0,13–1,47', dir:'lower', base:2.28, grp:'Vitamine/Mineralien'},
+  {k:'q10', n:'Coenzym Q10', ref:'750–1600', dir:'higher', base:746, grp:'Vitamine/Mineralien'},
+  {k:'zink', n:'Zink', ref:'normal', dir:'range', base:587, grp:'Vitamine/Mineralien'},
+  {k:'kupfer', n:'Kupfer', ref:'normal', dir:'range', base:97.9, grp:'Vitamine/Mineralien'},
+  {k:'selen', n:'Selen', ref:'normal', dir:'range', base:99.5, grp:'Vitamine/Mineralien'},
+  {k:'elastase', n:'Pankreas-Elastase', ref:'>200', dir:'higher', base:117, grp:'Darm'},
+  {k:'siga', n:'sIgA (Stuhl)', ref:'510–2040', dir:'higher', base:168, grp:'Darm'},
+  {k:'leuko', n:'Leukozyten', ref:'4–10', dir:'higher', base:3.9, grp:'Blutbild'},
+  {k:'cortisol', n:'Cortisol früh', ref:'—', dir:'lower', base:21.14, grp:'Stress/Hormone'},
+  {k:'alt', n:'ALT (GPT)', ref:'<50', dir:'range', base:null, grp:'Leber (Ashwa-Monitoring)'},
+  {k:'ast', n:'AST (GOT)', ref:'<50', dir:'range', base:null, grp:'Leber (Ashwa-Monitoring)'},
+  {k:'ggt', n:'GGT', ref:'<60', dir:'range', base:null, grp:'Leber (Ashwa-Monitoring)'},
+  {k:'tsh', n:'TSH', ref:'0,4–4,0', dir:'range', base:null, grp:'Stress/Hormone'},
+  {k:'hba1c', n:'HbA1c', ref:'<5,7', dir:'range', base:null, grp:'Stoffwechsel'}
+];
+function labFromRef(ref){ // parst Referenz → {lo,hi}
+  if(!ref) return null; const R=ref.replace(',','.');
+  let m=R.match(/^<\s*([\d.]+)/); if(m) return {lo:null, hi:+m[1]};
+  m=R.match(/^>\s*([\d.]+)/); if(m) return {lo:+m[1], hi:null};
+  m=R.match(/([\d.]+)\s*[–-]\s*([\d.]+)/); if(m) return {lo:+m[1], hi:+m[2]};
+  return null;
+}
+function labRefStatus(v, ref){ const b=labFromRef(ref); if(b==null||v==null) return 'na';
+  if(b.lo!=null && v<b.lo) return 'low'; if(b.hi!=null && v>b.hi) return 'high'; return 'ok'; }
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
 const NORM = {
@@ -973,7 +1033,8 @@ $('#icsBtn').addEventListener('click',exportIcs);
 function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
 function load(){ try{ const d=JSON.parse(localStorage.getItem('atem')); if(d) Object.assign(state.settings,d); }catch(e){}
   if((state.settings.planVer||0) < DEF.planVer){ state.settings.planText=DEF.planText; state.settings.planVer=DEF.planVer; save(); }
-  if((state.settings.auditVer||0) < DEF.auditVer){ state.settings.audit=DEF.audit; state.settings.auditVer=DEF.auditVer; if(!state.settings.auditDone) state.settings.auditDone={}; save(); } }
+  if((state.settings.auditVer||0) < DEF.auditVer){ state.settings.audit=DEF.audit; state.settings.auditVer=DEF.auditVer; if(!state.settings.auditDone) state.settings.auditDone={}; save(); }
+  if(!state.settings.labHistory || !state.settings.labHistory.length){ const b={}; LAB_MARKERS.forEach(m=>{ if(m.base!=null) b[m.k]=m.base; }); state.settings.labHistory=[{date:'2026-04-15', src:'Eurofins Lab4more 04/2026', vals:b}]; state.settings.labsVer=DEF.labsVer; save(); } }
 
 /* ============================================================
    HRV METRIC ENGINE (time + frequency domain)
@@ -1380,7 +1441,7 @@ function blocksHtml(text, showNow){
     return head+`<div class="pblock ${now?'now':''}"><h3><span>${esc(b.name)}</span><span>${now?'<span class="pnow">Jetzt</span>':''}<span class="ptime">${b.time||''}</span></span></h3>${items}${note}</div>`;
   }).join('');
 }
-function renderPlan(){ $('#planBlocks').innerHTML=blocksHtml(state.settings.planText,true); renderAudit(); renderNutrition(); }
+function renderPlan(){ $('#planBlocks').innerHTML=blocksHtml(state.settings.planText,true); renderAudit(); renderLabs(); renderNutrition(); }
 function renderNutrition(){ $('#nutritionBlocks').innerHTML=blocksHtml(state.settings.nutritionText,false); }
 /* ---------- Supplement↔Marker-Audit ---------- */
 function fmtDay(iso){ if(!iso) return ''; const p=String(iso).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:iso; }
@@ -1433,6 +1494,112 @@ function renderAudit(){
     state.settings.auditDone[k]=new Date().toISOString().slice(0,10); save(); renderAudit(); renderToday(); toast('Als geprüft markiert.');
   }));
 }
+/* ---------- Laborwerte-Tracking (Punkt 3) ---------- */
+function fmtNum(v){ return v==null?'—':(Math.round(v*100)/100).toString().replace('.',','); }
+function labArrow(dir, latest, prev){
+  if(prev==null||latest==null||latest===prev) return {a:'→', good:null};
+  const up=latest>prev; let good=null; if(dir==='higher') good=up; else if(dir==='lower') good=!up;
+  return {a:up?'↑':'↓', good};
+}
+function renderLabs(){
+  const box=$('#labList'); if(!box) return;
+  const hist=(state.settings.labHistory||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+  if(!hist.length){ box.innerHTML='<div class="pitem-info" style="color:var(--dim)">Noch keine Laborwerte.</div>'; return; }
+  const groups={};
+  LAB_MARKERS.forEach(m=>{ let lv=null, pv=null;
+    for(let i=hist.length-1;i>=0;i--){ const v=hist[i].vals[m.k]; if(v!=null){ if(lv==null) lv=v; else { pv=v; break; } } }
+    if(lv==null) return; (groups[m.grp]=groups[m.grp]||[]).push({m,lv,pv}); });
+  const latest=hist[hist.length-1];
+  box.innerHTML = Object.keys(groups).map(g=>{
+    const rows=groups[g].map(({m,lv,pv})=>{
+      const st=labRefStatus(lv,m.ref), ar=labArrow(m.dir,lv,pv);
+      const arColor=ar.good===true?'#7fc79b':(ar.good===false?'#ef9a9a':'var(--dim)');
+      const vColor=st==='ok'?'#7fc79b':(st==='na'?'var(--txt)':'#e0b063');
+      return `<div class="lab-row"><span class="lab-n">${esc(m.n)}</span>`
+        +`<span class="lab-v" style="color:${vColor}">${fmtNum(lv)}</span>`
+        +`<span class="lab-ar" style="color:${arColor}">${ar.a}${pv!=null?` <small>(${fmtNum(pv)})</small>`:''}</span>`
+        +`<span class="lab-ref">${esc(m.ref)}</span></div>`;
+    }).join('');
+    return `<div class="lab-grp">${esc(g)}</div>${rows}`;
+  }).join('') + `<div class="lab-meta">Neuester Eintrag: ${fmtDay(latest.date)}${latest.src?` · ${esc(latest.src)}`:''} · ${hist.length} Messung(en)</div>`;
+}
+function buildLabInputs(){
+  const hist=(state.settings.labHistory||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+  const latest=hist.length?hist[hist.length-1]:{vals:{}};
+  $('#labInputs').innerHTML=LAB_MARKERS.map(m=>{ const v=latest.vals[m.k];
+    return `<div class="row" style="margin-bottom:6px;"><span class="ci-lbl" style="flex:0 0 150px;">${esc(m.n)} <small style="color:var(--dim)">${esc(m.ref)}</small></span><input class="ci-in lab-in" data-lab="${m.k}" inputmode="decimal" placeholder="${v!=null?fmtNum(v):'—'}" value=""></div>`;
+  }).join('');
+}
+if($('#labAddBtn')){
+  $('#labAddBtn').addEventListener('click',()=>{ buildLabInputs(); $('#labDate').value=new Date().toISOString().slice(0,10); $('#labSrc').value=''; $('#labEditor').classList.remove('hide'); $('#labAddBtn').classList.add('hide'); });
+  $('#labCancel').addEventListener('click',()=>{ $('#labEditor').classList.add('hide'); $('#labAddBtn').classList.remove('hide'); });
+  $('#labSave').addEventListener('click',()=>{
+    const date=$('#labDate').value||new Date().toISOString().slice(0,10); const vals={};
+    document.querySelectorAll('.lab-in').forEach(inp=>{ const t=inp.value.trim().replace(',','.'); if(t!==''&&!isNaN(+t)) vals[inp.dataset.lab]=+t; });
+    if(!Object.keys(vals).length){ toast('Keine Werte eingegeben.'); return; }
+    state.settings.labHistory=state.settings.labHistory||[];
+    const ex=state.settings.labHistory.find(e=>e.date===date);
+    if(ex){ Object.assign(ex.vals,vals); if($('#labSrc').value.trim()) ex.src=$('#labSrc').value.trim(); }
+    else state.settings.labHistory.push({date, src:$('#labSrc').value.trim(), vals});
+    save(); $('#labEditor').classList.add('hide'); $('#labAddBtn').classList.remove('hide'); renderLabs(); toast('Laborwerte gespeichert.');
+  });
+}
+/* ---------- Korrelations-Insights (Punkt 4) ---------- */
+function computeInsights(){
+  const h=loadHist(), out=[], avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null, r1=v=>Math.round(v), DAY=86400000;
+  const gar=h.filter(x=>x.mode==='garmin'&&x.rmssd!=null).sort((a,b)=>a.ts-b.ts);
+  const logs=h.filter(x=>x.mode==='log'), acts=h.filter(x=>x.mode==='activity');
+  const actDks=new Set(acts.map(a=>dayKey(a.ts)));
+  const alcDks=new Set(logs.filter(l=>{ const a=(l.alcohol||'').toLowerCase().trim(); return a && !/^(nein|kein|keine|0|-|nix|nichts)/.test(a); }).map(l=>dayKey(l.ts)));
+  if(gar.length){ const last7=gar.slice(-7), m=avg(last7.map(x=>x.v!==undefined?x.v:x.rmssd)); const lv=last7.map(x=>x.rmssd); const mm=avg(lv);
+    const lo=gar[gar.length-1].baseLo, hi=gar[gar.length-1].baseHi;
+    const cmp=(lo&&mm<lo)?'unter':(hi&&mm>hi)?'über':'in';
+    out.push({icon:'💓',kind:cmp==='unter'?'warn':'ok',title:`HRV 7-Tage-Ø ${r1(mm)} ms`,detail:`${(lo&&hi)?`Baseline ${r1(lo)}–${r1(hi)} ms → ${cmp==='in'?'im Korridor':cmp+' der Baseline'}`:'persönlicher Trend'}${lv.length<7?` · nur ${lv.length} Nächte`:''}`}); }
+  const afterAct=[], noAct=[];
+  gar.forEach(x=>{ (actDks.has(dayKey(x.ts-DAY))?afterAct:noAct).push(x.rmssd); });
+  if(afterAct.length>=2&&noAct.length>=2){ const a=avg(afterAct), b=avg(noAct), d=r1(a-b);
+    out.push({icon:'🚴',kind:a<b?'warn':'ok',title:`HRV nach Training: ${r1(a)} ms`,detail:`vs ${r1(b)} ms ohne Vortags-Training (${d>=0?'+':''}${d} ms · ${afterAct.length} vs ${noAct.length} Nächte)`}); }
+  if(alcDks.size){ const aA=[], aB=[]; gar.forEach(x=>{ (alcDks.has(dayKey(x.ts-DAY))?aA:aB).push(x.rmssd); });
+    if(aA.length>=2&&aB.length>=2){ const a=avg(aA), b=avg(aB), d=r1(a-b);
+      out.push({icon:'🍷',kind:a<b?'warn':'ok',title:`HRV nach Alkohol: ${r1(a)} ms`,detail:`vs ${r1(b)} ms nüchtern (${d>=0?'+':''}${d} ms · ${aA.length} vs ${aB.length} Nächte)`}); } }
+  const brux=logs.filter(l=>l.bruxism&&l.sleepScore!=null).map(l=>l.sleepScore), nob=logs.filter(l=>!l.bruxism&&l.sleepScore!=null).map(l=>l.sleepScore);
+  if(brux.length>=2&&nob.length>=2){ const a=avg(brux), b=avg(nob);
+    out.push({icon:'😬',kind:a<b?'warn':'neutral',title:`Schlaf an Knirsch-Nächten: ${a.toFixed(1)}/5`,detail:`vs ${b.toFixed(1)}/5 ohne Knirschen (${brux.length} vs ${nob.length} Tage)`}); }
+  const now=Date.now(), brux14=logs.filter(l=>l.ts>=now-14*DAY&&l.bruxism).length, logs14=logs.filter(l=>l.ts>=now-14*DAY).length;
+  if(logs14>=3) out.push({icon:'🦷',kind:brux14>logs14/2?'warn':'ok',title:`Knirschen: ${brux14} von ${logs14} Nächten`,detail:`letzte 14 Tage${brux14>logs14/2?' — häufig, FaceFormer/Schiene priorisieren':''}`});
+  return out;
+}
+function renderInsights(){ const el=$('#todayInsights'); if(!el) return;
+  const ins=computeInsights();
+  if(!ins.length){ el.classList.add('hide'); el.innerHTML=''; return; }
+  el.classList.remove('hide');
+  el.innerHTML=`<h3><span>🔗 Zusammenhänge</span></h3>`+ins.map(i=>`<div class="ins-row ins-${i.kind}"><span class="ins-i">${i.icon}</span><div><div class="ins-t">${esc(i.title)}</div><div class="ins-d">${esc(i.detail)}</div></div></div>`).join('');
+}
+/* ---------- Sport-Empfehlung (Punkt 5) ---------- */
+function weeklyPlan(){
+  const h=loadHist(), now=Date.now(), DAY=86400000;
+  const acts=h.filter(x=>x.mode==='activity'&&x.ts>=now-7*DAY);
+  const cnt=acts.length, km=Math.round(acts.reduce((s,x)=>s+(x.distance||0),0)/1000), durMin=Math.round(acts.reduce((s,x)=>s+(x.dur||0),0)/60);
+  const gar=h.filter(x=>x.mode==='garmin'&&x.rmssd!=null).sort((a,b)=>a.ts-b.ts), last=gar[gar.length-1];
+  let rec='normal'; if(last){ if(last.baseLo&&last.rmssd<last.baseLo) rec='low'; else if(last.baseHi&&last.rmssd>last.baseHi) rec='high'; }
+  const sessions = rec==='low'
+    ? [{t:'Erholung zuerst',d:'HRV unter Baseline → 1–2 Tage locker, Spaziergang/Mobilität statt Intensität'},
+       {t:'1× lockeres Rad',d:'GA1, 45–75 Min, niedriger Puls — erst wenn HRV sich erholt'},
+       {t:'2× Atem + Mobilität',d:'4-6-Resonanz + Nacken/BWS gegen den Sympathikus-Überhang'}]
+    : [{t:'1× lange Ausfahrt',d:'GA1-Rad 2–3 h — Nacht danach freihalten (nach 100 ern kam der Überhang)'},
+       {t:'1× Intervalle/Tempo',d:'z. B. 4×5 Min Schwelle, an einem Tag mit guter HRV'},
+       {t:'1× Kraft/Core + Mobilität',d:'Rumpf + Nacken/BWS (Forward-Head), 30–40 Min'},
+       {t:'2–3 Ruhetage',d:'aktive Erholung, Atemübung, früh schlafen'}];
+  return {cnt, km, durMin, rec, sessions};
+}
+function renderTraining(){ const el=$('#todayTraining'); if(!el) return;
+  const p=weeklyPlan(), isSun=new Date().getDay()===0;
+  const recTxt={low:'🔴 Erholung nötig',normal:'🟢 normal',high:'🟢 frisch'}[p.rec];
+  el.innerHTML=`<h3><span>🚴 Trainingswoche</span><span style="font-size:12px;color:var(--dim)">${isSun?'Wochenplan':'diese Woche'}</span></h3>`
+    +`<div class="pitem-info">Letzte 7 Tage: <b>${p.cnt}</b> Einheit(en)${p.km?` · ${p.km} km`:''}${p.durMin?` · ${p.durMin} Min`:''} · Erholung: ${recTxt}</div>`
+    +`<div style="margin-top:8px;">`+p.sessions.map(s=>`<div class="pitem-info">• <b>${esc(s.t)}</b> <span style="color:var(--dim)">— ${esc(s.d)}</span></div>`).join('')+`</div>`
+    +`<div class="pnote" style="margin-top:8px;">👉 Empfehlung, kein Muss — passt sich an HRV & letzte Belastung an.</div>`;
+}
 $('#nutriEditBtn').addEventListener('click',()=>{ $('#nutritionText').value=state.settings.nutritionText; $('#nutriEditor').classList.remove('hide'); $('#nutritionBlocks').classList.add('hide'); $('#nutriEditBtn').classList.add('hide'); });
 $('#nutriCancel').addEventListener('click',()=>{ $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); });
 $('#nutriSave').addEventListener('click',()=>{ state.settings.nutritionText=$('#nutritionText').value; save(); $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); renderNutrition(); toast('Ernährung gespeichert.'); });
@@ -1475,7 +1642,7 @@ function renderToday(){
         +` <a id="toPlanAudit" style="color:var(--teal); cursor:pointer;">im Plan prüfen →</a></div>`;
       const la=$('#toPlanAudit'); if(la) la.addEventListener('click',()=>switchMode('plan'));
     } else { ael.classList.add('hide'); ael.innerHTML=''; } }
-  renderMobility(); renderCheckin();
+  renderInsights(); renderTraining(); renderMobility(); renderCheckin();
 }
 /* ---------- Tages-Check-in (Kontext-Log) ---------- */
 function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mode==='log'&&dayKey(r.ts)===dk)||null; }
@@ -1536,6 +1703,14 @@ function exportCC(){
     const next=audit.filter(x=>x.s.retest).sort((a,b)=>a.s.retest<b.s.retest?-1:1).slice(0,3);
     if(next.length) md+=`- Nächste Kontrollen: ${next.map(x=>`${fmtDay(x.s.retest)} ${x.s.name}`).join(' · ')}\n`;
   }
+  const lh=(state.settings.labHistory||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+  if(lh.length){ const latest=lh[lh.length-1];
+    const flags=LAB_MARKERS.filter(m=>{ const v=latest.vals[m.k]; if(v==null) return false; const s=labRefStatus(v,m.ref); return s==='high'||s==='low'; }).map(m=>`${m.n} ${fmtNum(latest.vals[m.k])} (${m.ref})`);
+    md+=`\n## 🧪 Laborwerte (${fmtDay(latest.date)}${latest.src?`, ${latest.src}`:''})\n`;
+    md+= flags.length?`- Außerhalb Referenz: ${flags.join(', ')}\n`:`- Alle erfassten Werte im Referenzbereich\n`;
+  }
+  const ins=computeInsights();
+  if(ins.length){ md+=`\n## 🔗 Zusammenhänge\n`; ins.forEach(i=>{ md+=`- ${i.title} — ${i.detail}\n`; }); }
   md+=`\n_Bitte im Licht meines Gesundheitsprofils (PROFIL-STEFAN.md) auswerten und das Profil ggf. ergänzen._\n`;
   try{ if(navigator.clipboard) navigator.clipboard.writeText(md); }catch(e){}
   const blob=new Blob([md],{type:'text/markdown'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`atem-cc-uebergabe-${new Date().toISOString().slice(0,10)}.md`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);

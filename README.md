@@ -98,6 +98,7 @@ git add -A && git commit -m "..." && git push
 - **v13–v18** Tages-Check-in & Symptom-Log · CC-Übergabe-Export (geflaggte Punkte + 7-Tage-Kontext + HRV) · Haltung/Kiefer-Übungen („Übung des Tages") · Supplement-Plan auf Stufe-0-Stand korrigiert (planVer-Migration) · Ernährungs-Rahmen
 - **v19** Garmin-Aktivitäten: Namen übersetzt (cycling→Radfahren) + Distanz (km) + Sport-Filter im Verlauf
 - **v20** Supplement↔Marker-Audit (Selbst-Audit): jedes Präparat mit Marker/Zielwert/Kontrolldatum/Abbruchkriterium; Flags Streich-Kandidat/Reduktion/überfällig/Sicherheit; Summary-Badges, Heute-Flag, „Als geprüft markieren", CC-Export-Sektion. `auditVer`-Migration, User-Häkchen in `auditDone`.
+- **v21** Drei Gesundheits-Engines: **Laborwerte-Tracking** (Plan-Tab, `LAB_MARKERS` + `labHistory`, Baseline 04/2026 geseedet, Trend-Pfeile vs. Vormessung, Referenz-Ampel, neue Werte eintragbar) · **Korrelations-Insights** (Heute „🔗 Zusammenhänge": HRV vs. Baseline, HRV nach Training/Alkohol, Knirschen↔Schlaf, Knirsch-Häufigkeit — zeitstempel-basiertes Vortags-Matching, min. 2 Datenpunkte je Seite) · **Sport-Empfehlung** (Heute „🚴 Trainingswoche": Wochenplan aus letzter Belastung + HRV-Erholungszustand). Alle drei speisen den CC-Export.
 
 ## Richtung: Gesundheits-Companion
 Die App wächst über Atmung/HRV hinaus zu einem täglichen Gesundheits-Cockpit. Tabs: **Heute** (Dashboard/Home) · Atem · Seufzer · HRV · Plan · Verlauf.
