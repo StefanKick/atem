@@ -179,6 +179,9 @@ def main():
         print("Keine Garmin-Daten erkannt.", file=sys.stderr); sys.exit(1)
     doc = {"app": "atem", "version": 14,
            "exported": datetime.now().isoformat(timespec="seconds"), "history": entries}
+    outdir = os.path.dirname(os.path.abspath(args.out))
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, indent=2)
     print(f"{len(entries)} Garmin-Nächte → {args.out}")
