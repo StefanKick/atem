@@ -268,12 +268,6 @@
   <div id="todayView" class="hide">
     <div id="todayGreet" style="font-size:15px; margin:2px 0 14px; text-align:center; color:var(--dim);"></div>
     <div id="todayReadiness"></div>
-    <div class="pblock" id="todayRoadmap"></div>
-    <div id="roadmapEditor" class="hide" style="margin-bottom:14px;">
-      <textarea id="roadmapText" class="editta" spellcheck="false" style="height:150px"></textarea>
-      <p class="hint">Format: <b>YYYY-MM-DD | Titel | Hinweis</b> — je Termin eine Zeile.</p>
-      <div class="row"><button class="btn sm" id="roadmapSave">Speichern</button><button class="btn ghost sm" id="roadmapCancel">Abbrechen</button></div>
-    </div>
     <div class="pblock" id="todaySupp"></div>
     <div class="pblock" id="todayAtem"></div>
     <div class="pblock" id="todayHrv"></div>
@@ -412,42 +406,37 @@ const $ = s => document.querySelector(s);
 const DEF = { in:4, h1:0, out:6, h2:0, resDurMin:5, resNoLimit:false, hrvDurMin:5, hrvNoLimit:false,
               scanDurMin:3, sighCount:4, sighMode:'count', sighDurMin:3, measure:false, scanStyle:'pulse',
               remOn:false, remMorning:'07:30', remEvening:'21:00',
-              hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989, planVer:2,
+              hrvTarget:50, sound:true, soundStyle:'pad', bg:'off', bgVol:0.5, bgCouple:true, vibe:true, wake:true, birthYear:1989, planVer:3,
               planText:`# 🌅 Morgens
-## Nach dem Aufstehen 06:30
-Natriumselenit | 1 Kapsel 200 µg
+## Nüchtern (nach dem Aufstehen) 06:30
 Mucoflora | 2 Kapseln
-MucoEffekt | 4 Kapseln (1 mehr)
+MucoEffekt | 4 Kapseln
 Colibiogen oral | 1 Teelöffel
 Mucoactiv | 1 Messlöffel
-EAA Pulver | 1 Messlöffel
-> Einnahme: Alles mit einem großen Glas Wasser. EAA-Pulver in ca. 300 ml Wasser shaken. (Nüchtern, ~30 Min vor dem Frühstück)
+> Mit großem Glas Wasser, ~30 Min vor dem Frühstück. (Natriumselenit pausiert · EAA gestrichen — Stufe 0)
 ## Zum Frühstück 07:30
-LaVita + Creatin | 1 Glas
-Magnesiumbisglycinat | 1 g (1/3 TL)
 NORSAN Omega-3 | 1 Esslöffel (+ opt. 1 EL Olivenöl)
 Vitamin D3 + K2 | 1 Tropfen
 Coenzym Q10 | 1 Kapsel (100 mg)
 Das Multi | 1 Kapsel
-Bio Ashwagandha | 2 Kapseln
-Mico-Cord (Cordyceps) | 4 Kapseln
-Zinkbisglycinat | 1 Kapsel (25 mg)
-> Einnahme: Magnesium in den Joghurt rühren. Den Rest zum Essen.
+Bio Ashwagandha KSM-66 | 1 Kapsel (war 4)
+Mico-Cord (Cordyceps) | 2 Kapseln (Rest mittags)
+Zinkbisglycinat | 15 mg (war 25)
+Creatin | 3–5 g
+Magnesiumbisglycinat | 1 g (1/3 TL)
+> Magnesium in den Joghurt, 2 h Abstand zu Kaffee/Tee. LaVita gestrichen. Ab 11.08. Mg-Test → nur noch 1× abends.
+## Mittags 12:30
+Mico-Cord (Cordyceps) | 2 Kapseln
 # 🌆 Abends & Nachts
 ## Vor dem Abendessen 18:00
-MucoEffekt | 5 Kapseln (Rest für den Tag)
+MucoEffekt | 5 Kapseln
 Mucoactiv | 1 Messlöffel
-> Einnahme: Pulver in einem Glas Wasser auflösen und mit den Kapseln trinken. (~30 Min vor dem Essen)
+> Pulver in einem Glas Wasser auflösen und mit den Kapseln trinken.
 ## Zum Abendessen 18:30
-Bio Ashwagandha | 2 Kapseln
 Magnesiumbisglycinat | 1 g (1/3 TL)
 ## Vor dem Schlafengehen 22:00
 Magnesiumbisglycinat | 1 g (1/3 TL)
-> Einnahme: In einem halben Glas Wasser verrühren. Finale Dosis gegen das Zähneknirschen.`,
-              roadmapText:`2026-08-14 | Blutabnahme | Vit-D-Kontrolle + Kontrollwerte. ⚠️ Biotin ab 11.08. pausieren!
-2026-09-04 | Probiotika-Ende | Danach startet das Atemtest-Fenster.
-2026-09-21 | FODMAP-Start | H2/CH4-Atemtest MUSS davor liegen (Fenster 04.09.–21.09.).
-2026-11-30 | Stufenplan-Ende | 6-Stufen-Darm-Plan abgeschlossen.`,
+> In halbem Glas Wasser verrühren. Gegen das Zähneknirschen. (Ab 11.08. die einzige Mg-Dosis.)`,
               nutritionText:`## Prinzipien
 Protein + Fett + Ballaststoffe zu jeder Mahlzeit | gegen das 15-Uhr-Tief
 Omega-3 hoch, verarbeitetes Fleisch runter | AA:EPA 9,6 senken
@@ -1300,22 +1289,6 @@ function blocksHtml(text, showNow){
 }
 function renderPlan(){ $('#planBlocks').innerHTML=blocksHtml(state.settings.planText,true); renderNutrition(); }
 function renderNutrition(){ $('#nutritionBlocks').innerHTML=blocksHtml(state.settings.nutritionText,false); }
-function parseRoadmap(text){ return (text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{ const p=l.split('|').map(s=>s.trim()); return {date:p[0]||'', title:p[1]||'', note:p[2]||''}; }).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)); }
-function renderRoadmap(){
-  const items=parseRoadmap(state.settings.roadmapText); const today=new Date(); today.setHours(0,0,0,0);
-  items.forEach(it=>{ it.d=new Date(it.date+'T00:00:00'); it.days=Math.round((it.d-today)/86400000); });
-  items.sort((a,b)=>a.d-b.d);
-  const rows=items.map(it=>{ let when,col;
-    if(it.days<0){ when='überfällig'; col='var(--bad)'; } else if(it.days===0){ when='heute'; col='var(--warn)'; }
-    else if(it.days<=14){ when=`in ${it.days} T`; col='var(--warn)'; } else { when=`in ${it.days} T`; col='var(--dim)'; }
-    const dstr=it.d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
-    return `<div class="rm-item"><div class="rm-when" style="color:${col}">${dstr}<br><span style="font-weight:400;font-size:11px">${when}</span></div><div class="rm-main"><div class="t">${esc(it.title)}</div>${it.note?`<div class="n">${esc(it.note)}</div>`:''}</div></div>`;
-  }).join('') || '<div class="rm-main"><div class="n">Keine Termine hinterlegt.</div></div>';
-  $('#todayRoadmap').innerHTML=`<h3><span>🗓️ Gesundheits-Fahrplan</span><span class="rm-edit" id="roadmapEditBtn">bearbeiten</span></h3>${rows}`;
-  const eb=$('#roadmapEditBtn'); if(eb) eb.addEventListener('click',()=>{ $('#roadmapText').value=state.settings.roadmapText; $('#roadmapEditor').classList.remove('hide'); $('#todayRoadmap').classList.add('hide'); });
-}
-$('#roadmapSave').addEventListener('click',()=>{ state.settings.roadmapText=$('#roadmapText').value; save(); $('#roadmapEditor').classList.add('hide'); $('#todayRoadmap').classList.remove('hide'); renderRoadmap(); toast('Fahrplan gespeichert.'); });
-$('#roadmapCancel').addEventListener('click',()=>{ $('#roadmapEditor').classList.add('hide'); $('#todayRoadmap').classList.remove('hide'); });
 $('#nutriEditBtn').addEventListener('click',()=>{ $('#nutritionText').value=state.settings.nutritionText; $('#nutriEditor').classList.remove('hide'); $('#nutritionBlocks').classList.add('hide'); $('#nutriEditBtn').classList.add('hide'); });
 $('#nutriCancel').addEventListener('click',()=>{ $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); });
 $('#nutriSave').addEventListener('click',()=>{ state.settings.nutritionText=$('#nutritionText').value; save(); $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); renderNutrition(); toast('Ernährung gespeichert.'); });
@@ -1339,7 +1312,7 @@ function renderToday(){
   $('#todayHrv').innerHTML=`<h3><span>💓 HRV</span></h3><div class="pitem-info">${hrvLine}</div>`;
   const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
   const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
-  renderRoadmap(); renderCheckin();
+  renderCheckin();
 }
 /* ---------- Tages-Check-in (Kontext-Log) ---------- */
 function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mode==='log'&&dayKey(r.ts)===dk)||null; }
