@@ -183,6 +183,7 @@
   .ci-chip.on{background:var(--teal-dim); color:#fff; border-color:var(--teal);}
   .ci-in{flex:1; min-width:130px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:7px 10px; font-size:13px;}
   .ci-toggle{display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--txt); margin:9px 0;}
+  .ci-sec{font-size:11px; color:var(--teal); text-transform:uppercase; letter-spacing:.5px; margin:14px 0 4px; border-top:1px solid #1b2b45; padding-top:11px;}
   #planText, .editta{width:100%; height:340px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:10px 12px; font-size:13px; font-family:ui-monospace,Menlo,monospace; line-height:1.5;}
   .rm-item{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-top:1px solid #1b2b45;}
   .rm-item:first-of-type{border-top:none;}
@@ -1153,7 +1154,7 @@ function renderHistory(){
     else if(r.mode==='scan') met=`<b>${r.rmssd!=null?Math.round(r.rmssd):'–'}</b> RMSSD${r.meanHR?` · ${Math.round(r.meanHR)}bpm`:''}`;
     else if(r.mode==='garmin') met=`<b>${Math.round(r.rmssd)}</b> ms Nacht${r.g7!=null?` · Ø7 ${r.g7}`:''}`;
     else if(r.mode==='sigh') met=`<b>${r.cycles}</b> Seufzer`;
-    else if(r.mode==='log') met=`${r.flagCC?'🧠 ':''}${r.sleepScore?`Schlaf <b>${r.sleepScore}</b>`:''}${r.mood?` · Stimmung ${r.mood}`:''}`||'Check-in';
+    else if(r.mode==='log'){ const p=[]; if(r.sleepScore) p.push(`Schlaf ${r.sleepScore}`); if(r.stools!=null) p.push(`Stühle ${r.stools}`); if(r.bristol) p.push(`Bristol ${r.bristol}`); if(r.urgency!=null) p.push(`Drang ${r.urgency}`); met=`${r.flagCC?'🧠 ':''}${p.join(' · ')||'Check-in'}`; }
     else if(r.mode==='sleep') met=`<b>${r.score!=null?r.score:'–'}</b> Score${r.hours?` · ${r.hours}h`:''}`;
     else if(r.mode==='activity') met=`<b>${esc(r.name||'Aktivität')}</b>${r.dur?` · ${Math.round(r.dur/60)} Min`:''}`;
     else met=`<b>${r.breaths||0}</b> Atemzüge`;
@@ -1316,25 +1317,38 @@ function renderToday(){
 }
 /* ---------- Tages-Check-in (Kontext-Log) ---------- */
 function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mode==='log'&&dayKey(r.ts)===dk)||null; }
-function ratingRow(label,key,val){ let c=''; for(let i=1;i<=5;i++) c+=`<div class="ci-chip ${val===i?'on':''}" data-ci="${key}" data-v="${i}">${i}</div>`; return `<div class="ci-row"><span class="ci-lbl">${label}</span>${c}</div>`; }
+function ratingRow(label,key,val,lo,hi){ lo=lo==null?1:lo; hi=hi==null?5:hi; let c=''; for(let i=lo;i<=hi;i++) c+=`<div class="ci-chip ${val===i?'on':''}" data-ci="${key}" data-v="${i}">${i}</div>`; return `<div class="ci-row"><span class="ci-lbl">${label}</span>${c}</div>`; }
 function renderCheckin(){
   const t=todayLog()||{};
   $('#todayCheckin').innerHTML=`<h3><span>📝 Tages-Check-in</span><span class="ptime">${t.ts?'✓ heute':''}</span></h3>`
+   + `<div class="ci-sec">Zustand</div>`
    + ratingRow('Schlaf','sleepScore',t.sleepScore)
    + ratingRow('Stimmung','mood',t.mood)
+   + ratingRow('15-Uhr-Tief','dip',t.dip,0,3)
+   + `<div class="ci-toggle"><span>Knirschen letzte Nacht</span><div class="switch ${t.bruxism?'on':''}" id="ciBrux"></div></div>`
+   + `<div class="ci-sec">Darm (für den Magnesium-Test)</div>`
+   + `<div class="ci-row"><span class="ci-lbl">Stühle früh</span><input class="ci-in" id="ciStools" type="number" min="0" max="12" inputmode="numeric" placeholder="Anzahl" value="${t.stools!=null?t.stools:''}" style="max-width:110px"></div>`
+   + ratingRow('Bristol','bristol',t.bristol,1,7)
+   + ratingRow('Dringlichkeit','urgency',t.urgency,0,3)
+   + ratingRow('Blähungen','bloating',t.bloating,0,3)
+   + ratingRow('Seitenstechen re.','flank',t.flank,0,3)
+   + `<div class="ci-sec">Kontext</div>`
    + `<div class="ci-row"><span class="ci-lbl">Alkohol</span><input class="ci-in" id="ciAlcohol" placeholder="z. B. 2 Bier / nein" value="${esc(t.alcohol||'')}"></div>`
    + `<div class="ci-row"><span class="ci-lbl">Training</span><input class="ci-in" id="ciTraining" placeholder="z. B. 100 km Rad" value="${esc(t.training||'')}"></div>`
-   + `<div class="ci-row" style="align-items:flex-start"><span class="ci-lbl">Symptome</span><textarea class="ci-in" id="ciSymptoms" rows="2" placeholder="z. B. Verspannung linker unterer Nacken seit 3 Tagen">${esc(t.symptoms||'')}</textarea></div>`
+   + `<div class="ci-row" style="align-items:flex-start"><span class="ci-lbl">Symptome</span><textarea class="ci-in" id="ciSymptoms" rows="2" placeholder="z. B. Verspannung linker unterer Nacken">${esc(t.symptoms||'')}</textarea></div>`
    + `<div class="ci-row" style="align-items:flex-start"><span class="ci-lbl">Notiz</span><textarea class="ci-in" id="ciNote" rows="2" placeholder="frei">${esc(t.note||'')}</textarea></div>`
    + `<div class="ci-toggle"><span>🧠 Mit CC besprechen</span><div class="switch ${t.flagCC?'on':''}" id="ciFlag"></div></div>`
    + `<button class="btn sm" id="ciSave" style="max-width:220px">Check-in speichern</button>`;
   document.querySelectorAll('#todayCheckin .ci-chip').forEach(el=>el.addEventListener('click',()=>{ const sel=el.classList.contains('on'); document.querySelectorAll(`#todayCheckin .ci-chip[data-ci="${el.dataset.ci}"]`).forEach(x=>x.classList.remove('on')); if(!sel) el.classList.add('on'); }));
   $('#ciFlag').addEventListener('click',()=>$('#ciFlag').classList.toggle('on'));
+  $('#ciBrux').addEventListener('click',()=>$('#ciBrux').classList.toggle('on'));
   $('#ciSave').addEventListener('click',saveCheckin);
 }
 function saveCheckin(){
   const getR=key=>{ const on=document.querySelector(`#todayCheckin .ci-chip[data-ci="${key}"].on`); return on?+on.dataset.v:null; };
-  const rec={ sleepScore:getR('sleepScore'), mood:getR('mood'), alcohol:$('#ciAlcohol').value.trim(), training:$('#ciTraining').value.trim(), symptoms:$('#ciSymptoms').value.trim(), note:$('#ciNote').value.trim(), flagCC:$('#ciFlag').classList.contains('on') };
+  const rec={ sleepScore:getR('sleepScore'), mood:getR('mood'), dip:getR('dip'), bruxism:$('#ciBrux').classList.contains('on'),
+    stools: $('#ciStools').value!==''?+$('#ciStools').value:null, bristol:getR('bristol'), urgency:getR('urgency'), bloating:getR('bloating'), flank:getR('flank'),
+    alcohol:$('#ciAlcohol').value.trim(), training:$('#ciTraining').value.trim(), symptoms:$('#ciSymptoms').value.trim(), note:$('#ciNote').value.trim(), flagCC:$('#ciFlag').classList.contains('on') };
   const h=loadHist(), dk=dayKey(Date.now()), ex=h.find(r=>r.mode==='log'&&dayKey(r.ts)===dk);
   if(ex){ Object.assign(ex,rec); } else { h.push({ts:Date.now(),mode:'log',...rec}); }
   saveHist(h); renderToday(); toast('Check-in gespeichert.');
@@ -1348,7 +1362,7 @@ function exportCC(){
   let md=`# Atem-App → CC Übergabe (${new Date().toLocaleString('de-DE')})\n\n`;
   if(flagged.length){ md+=`## 🧠 Zur Besprechung geflaggt\n`; flagged.forEach(r=>{ md+=`- ${fmtDate(r.ts)}: ${r.symptoms||r.note||'(ohne Text)'}\n`; }); md+='\n'; }
   md+=`## Kontext letzte 7 Tage (Check-ins)\n`;
-  if(recentLogs.length) recentLogs.forEach(r=>{ md+=`- ${fmtDate(r.ts)}: Schlaf ${r.sleepScore||'–'}, Stimmung ${r.mood||'–'}${r.alcohol?`, Alkohol: ${r.alcohol}`:''}${r.training?`, Training: ${r.training}`:''}${r.symptoms?`, Symptome: ${r.symptoms}`:''}${r.note?`, Notiz: ${r.note}`:''}\n`; });
+  if(recentLogs.length) recentLogs.forEach(r=>{ const p=[]; if(r.sleepScore) p.push(`Schlaf ${r.sleepScore}/5`); if(r.mood) p.push(`Stimmung ${r.mood}/5`); if(r.dip!=null) p.push(`15-Uhr-Tief ${r.dip}/3`); if(r.bruxism) p.push(`Knirschen`); if(r.stools!=null) p.push(`Stühle ${r.stools}`); if(r.bristol) p.push(`Bristol ${r.bristol}`); if(r.urgency!=null) p.push(`Dringlichkeit ${r.urgency}/3`); if(r.bloating!=null) p.push(`Blähungen ${r.bloating}/3`); if(r.flank!=null) p.push(`Seitenstechen ${r.flank}/3`); if(r.alcohol) p.push(`Alkohol: ${r.alcohol}`); if(r.training) p.push(`Training: ${r.training}`); if(r.symptoms) p.push(`Symptome: ${r.symptoms}`); if(r.note) p.push(`Notiz: ${r.note}`); md+=`- ${fmtDate(r.ts)}: ${p.join(', ')}\n`; });
   else md+=`- (keine Check-ins)\n`;
   md+=`\n## HRV\n`;
   if(garmin.length) md+=`Garmin Nacht-HRV (letzte): ${garmin.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
