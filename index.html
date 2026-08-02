@@ -1130,6 +1130,8 @@ function logSession(r){ const h=loadHist(); r.ts=Date.now(); h.push(r); if(h.len
 
 const MODE_META={resonance:{i:'🫁',n:'Resonanz'},sigh:{i:'🌬️',n:'Seufzer'},hrv:{i:'💓',n:'HRV Training'},scan:{i:'🩺',n:'Ruhemessung'},garmin:{i:'🌙',n:'Garmin Nacht-HRV'},log:{i:'📝',n:'Tages-Check-in'},sleep:{i:'😴',n:'Schlaf (Garmin)'},activity:{i:'🚴',n:'Aktivität'}};
 const ACTIVE_MODES=['resonance','sigh','hrv','scan']; // aktive Übungen (Garmin/Log/Sleep = passive Daten)
+const ACTIVITY_NAMES={cycling:'Radfahren',road_biking:'Rennrad',mountain_biking:'Mountainbike',gravel_cycling:'Gravel',indoor_cycling:'Indoor-Rad',virtual_ride:'Indoor-Rad',running:'Laufen',treadmill_running:'Laufband',trail_running:'Trailrunning',walking:'Gehen',casual_walking:'Spazieren',hiking:'Wandern',tennis:'Tennis',padel:'Padel',swimming:'Schwimmen',lap_swimming:'Bahnenschwimmen',open_water_swimming:'Freiwasser',strength_training:'Krafttraining',pilates:'Pilates',yoga:'Yoga',cardio:'Cardio',hiit:'HIIT',elliptical:'Crosstrainer',rowing:'Rudern',indoor_rowing:'Indoor-Rudern',fitness_equipment:'Fitnessgerät',stand_up_paddleboarding:'SUP',skiing:'Ski',snowboarding:'Snowboard'};
+function actName(k){ if(!k) return 'Aktivität'; const c=String(k).replace(/_v\d+$/,''); return ACTIVITY_NAMES[c]||ACTIVITY_NAMES[k]||c.replace(/_/g,' ').replace(/\b\w/g,ch=>ch.toUpperCase()); }
 function fmtDate(ts){ const d=new Date(ts), now=new Date(); const sd=d.toDateString()===now.toDateString(); const yd=new Date(now); yd.setDate(now.getDate()-1); const iy=d.toDateString()===yd.toDateString(); const tm=d.toTimeString().slice(0,5); if(sd) return 'Heute '+tm; if(iy) return 'Gestern '+tm; return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+tm; }
 function dayKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); }
 function computeStreak(h){ if(!h.length) return 0; const days=new Set(h.map(r=>dayKey(r.ts))); let s=0; const d=new Date(); if(!days.has(dayKey(d.getTime()))){ d.setDate(d.getDate()-1); if(!days.has(dayKey(d.getTime()))) return 0; } while(days.has(dayKey(d.getTime()))){ s++; d.setDate(d.getDate()-1); } return s; }
@@ -1154,7 +1156,7 @@ function renderHistory(){
   document.querySelectorAll('#trendSeg button').forEach(b=>b.addEventListener('click',()=>{ curTrend=+b.dataset.i; renderTrend(h); document.querySelectorAll('#trendSeg button').forEach(x=>x.classList.toggle('on',x===b)); }));
   renderTrend(h);
   // Filter-Chips
-  const FILTERS=[['all','Alle'],['log','Check-in'],['hrv','HRV'],['scan','Ruhe'],['garmin','Garmin'],['sleep','Schlaf'],['resonance','Atem'],['sigh','Seufzer']];
+  const FILTERS=[['all','Alle'],['log','Check-in'],['hrv','HRV'],['scan','Ruhe'],['garmin','Garmin'],['sleep','Schlaf'],['activity','Sport'],['resonance','Atem'],['sigh','Seufzer']];
   $('#histFilter').innerHTML=FILTERS.map(([k,n])=>`<button class="${histFilter===k?'on':''}" data-f="${k}">${n}</button>`).join('');
   document.querySelectorAll('#histFilter button').forEach(b=>b.addEventListener('click',()=>{ histFilter=b.dataset.f; renderHistory(); }));
   // list (Original-Index bewahren für Öffnen/Löschen)
@@ -1169,10 +1171,10 @@ function renderHistory(){
     else if(r.mode==='sigh') met=`<b>${r.cycles}</b> Seufzer`;
     else if(r.mode==='log'){ const p=[]; if(r.sleepScore) p.push(`Schlaf ${r.sleepScore}`); if(r.stools!=null) p.push(`Stühle ${r.stools}`); if(r.bristol) p.push(`Bristol ${r.bristol}`); if(r.urgency!=null) p.push(`Drang ${r.urgency}`); met=`${r.flagCC?'🧠 ':''}${p.join(' · ')||'Check-in'}`; }
     else if(r.mode==='sleep') met=`<b>${r.score!=null?r.score:'–'}</b> Score${r.hours?` · ${r.hours}h`:''}`;
-    else if(r.mode==='activity') met=`<b>${esc(r.name||'Aktivität')}</b>${r.dur?` · ${Math.round(r.dur/60)} Min`:''}`;
+    else if(r.mode==='activity') met=r.distance>0?`<b>${(r.distance/1000).toFixed(1)}</b> km`:'Aktivität';
     else met=`<b>${r.breaths||0}</b> Atemzüge`;
     const clickable=(r.mode==='hrv'||r.mode==='scan');
-    return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${m.n}${r.mode==='garmin'?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
+    return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${r.mode==='activity'?esc(actName(r.name)):m.n}${(r.mode==='garmin'||r.mode==='sleep')?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
   }).join('');
   document.querySelectorAll('#histList .h-row[data-idx]').forEach(el=>el.addEventListener('click',()=>{ const r=loadHist()[+el.dataset.idx]; if(r) openResult(r); }));
   document.querySelectorAll('#histList .h-del').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const idx=+el.dataset.del, hh=loadHist(), r=hh[idx]; if(!r) return; const m=MODE_META[r.mode]||{n:r.mode}; if(confirm(`Diesen Eintrag löschen?\n${m.n} · ${fmtDate(r.ts)}`)){ hh.splice(idx,1); saveHist(hh); renderHistory(); toast('Eintrag gelöscht.'); } }));
