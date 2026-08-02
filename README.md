@@ -95,6 +95,9 @@ git add -A && git commit -m "..." && git push
 - **v10** Einzelne Verlaufs-Einträge löschbar (Zeile + Auswertung)
 - **v11** Supplement-Plan (Tab) — tageszeit-abhängig, editierbar *(in v12 auf Info-only umgebaut)*
 - **v12** „Heute"-Dashboard als Startseite (Tagesform + fälliger Supp-Block + Atem-Status + HRV) · Supplement-Plan Info-only (Gruppen/Einnahme-Hinweise, keine Häkchen/Kalender) · voller Original-Plan mit planVer-Migration
+- **v13–v18** Tages-Check-in & Symptom-Log · CC-Übergabe-Export (geflaggte Punkte + 7-Tage-Kontext + HRV) · Haltung/Kiefer-Übungen („Übung des Tages") · Supplement-Plan auf Stufe-0-Stand korrigiert (planVer-Migration) · Ernährungs-Rahmen
+- **v19** Garmin-Aktivitäten: Namen übersetzt (cycling→Radfahren) + Distanz (km) + Sport-Filter im Verlauf
+- **v20** Supplement↔Marker-Audit (Selbst-Audit): jedes Präparat mit Marker/Zielwert/Kontrolldatum/Abbruchkriterium; Flags Streich-Kandidat/Reduktion/überfällig/Sicherheit; Summary-Badges, Heute-Flag, „Als geprüft markieren", CC-Export-Sektion. `auditVer`-Migration, User-Häkchen in `auditDone`.
 
 ## Richtung: Gesundheits-Companion
 Die App wächst über Atmung/HRV hinaus zu einem täglichen Gesundheits-Cockpit. Tabs: **Heute** (Dashboard/Home) · Atem · Seufzer · HRV · Plan · Verlauf.

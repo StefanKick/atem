@@ -185,6 +185,33 @@
   .ci-toggle{display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--txt); margin:9px 0;}
   .ci-sec{font-size:11px; color:var(--teal); text-transform:uppercase; letter-spacing:.5px; margin:14px 0 4px; border-top:1px solid #1b2b45; padding-top:11px;}
   #planText, .editta{width:100%; height:340px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:10px 12px; font-size:13px; font-family:ui-monospace,Menlo,monospace; line-height:1.5;}
+  /* Supplement-Audit */
+  .audit-sum{display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 12px;}
+  .ab{display:inline-block; font-size:11px; padding:2px 9px; border-radius:20px; border:1px solid transparent; white-space:nowrap;}
+  .ab.strike{background:#3a2416; border-color:#7a4a1e; color:#e8a765;}
+  .ab.overdue{background:#3a1c1c; border-color:#7a3030; color:#ef9a9a;}
+  .ab.reduce{background:#16304a; border-color:#2b5378; color:#7cc3e0;}
+  .ab.warn{background:#33291a; border-color:#6a5320; color:#d9b25f;}
+  .ab.safety{background:#2a2340; border-color:#4a3d70; color:#c0aef0;}
+  .ab.ok{background:#153021; border-color:#2c5a3c; color:#7fc79b;}
+  .au-card{background:#0f1f33; border:1px solid var(--line); border-left:3px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+  .au-card.l-strike{border-left-color:#e8a765;}
+  .au-card.l-overdue{border-left-color:#ef9a9a;}
+  .au-card.l-reduce{border-left-color:#7cc3e0;}
+  .au-card.l-warn{border-left-color:#d9b25f;}
+  .au-card.l-safety{border-left-color:#c0aef0;}
+  .au-card.l-ok{border-left-color:#2c5a3c;}
+  .au-name{font-size:15px; font-weight:600;}
+  .au-name small{color:var(--dim); font-weight:400; font-size:12px;}
+  .au-badges{margin:6px 0 8px; display:flex; flex-wrap:wrap; gap:6px;}
+  .au-r{display:flex; gap:10px; font-size:13px; margin:3px 0; line-height:1.4;}
+  .au-r>b{flex:0 0 78px; color:var(--dim); font-weight:600; font-size:12px;}
+  .au-r>div{flex:1;}
+  .mk{display:inline-block; margin:0 6px 4px 0; font-size:12px; padding:1px 7px; border-radius:6px; background:#132a1e; color:#7fc79b;}
+  .mk.high, .mk.low{background:#33291a; color:#e0b063;}
+  .mk i{color:var(--dim); font-style:normal;}
+  .au-foot{margin-top:9px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .btn.xs{font-size:12px; padding:5px 11px; max-width:200px;}
   .rm-item{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-top:1px solid #1b2b45;}
   .rm-item:first-of-type{border-top:none;}
   .rm-when{font-size:12px; font-weight:700; flex:none; width:96px;}
@@ -270,6 +297,7 @@
     <div id="todayGreet" style="font-size:15px; margin:2px 0 14px; text-align:center; color:var(--dim);"></div>
     <div id="todayReadiness"></div>
     <div class="pblock" id="todaySupp"></div>
+    <div class="pblock hide" id="todayAudit"></div>
     <div class="pblock" id="todayAtem"></div>
     <div class="pblock" id="todayHrv"></div>
     <div class="pblock" id="todayMobility"></div>
@@ -292,6 +320,9 @@
       <p class="hint">Format: <b># Gruppe</b> (Überschrift) · <b>## Blockname HH:MM</b> (Zeitblock) · <b>Mittel | Dosis</b> (Zeile) · <b>&gt; Hinweis</b> (Einnahme-Notiz). Alles frei änderbar.</p>
       <div class="row"><button class="btn sm" id="planSave">Speichern</button><button class="btn ghost sm" id="planCancel">Abbrechen</button></div>
     </div>
+    <div class="sec-h" style="margin-top:24px;">🔍 Supplement-Check</div>
+    <p class="hint" style="margin:-4px 0 10px;">Jedes Präparat mit Zielwert/-symptom, Kontrolldatum und Abbruchkriterium. Fehlt Marker <b>und</b> Ziel → Streich-Kandidat.</p>
+    <div id="planAudit"></div>
     <div class="sec-h" style="margin-top:24px;">🍽️ Ernährung</div>
     <div id="nutritionBlocks"></div>
     <button class="btn ghost sm" id="nutriEditBtn" style="margin-top:12px; max-width:460px;">Ernährung bearbeiten</button>
@@ -473,7 +504,52 @@ Brustwirbelsäule aufrichten | über die Stuhllehne strecken — der eigentliche
 Schulterblätter zusammenziehen | Rudern, gegen den Rundrücken
 Mikropause | alle 30–60 Min: Chin Tuck + Schultern kreisen
 Kiefer locker | tagsüber "Zähne locker, Zunge am Gaumen"
-FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahnschutz)` };
+FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahnschutz)`,
+  auditVer:1, auditDone:{},
+  audit:[
+    {key:'darm', name:'Darm-Aufbau (Muco-Reihe + Colibiogen)', dose:'morgens nüchtern + abends',
+     markers:[{n:'sIgA',v:'<168',ref:'510–2040',st:'low'},{n:'Shannon',v:'3,8',ref:'reduziert',st:'low'},{n:'Elastase',v:'117',ref:'>200, konfundiert',st:'low'}],
+     target:'Stuhlfrequenz ↓, Konsistenz stabil, Seitenstechen seltener, sIgA ↑',
+     retest:'2026-09-04', retestLabel:'Stufe 3 · 12-Wochen-Marke',
+     stop:'Kein Kriterium erfüllt → alle vier absetzen (Neustart nur stammspezifisch)'},
+    {key:'omega', name:'NORSAN Omega-3', dose:'1 EL zum Frühstück',
+     markers:[{n:'AA:EPA',v:'9,6',ref:'<3',st:'high'},{n:'AA',v:'363',ref:'185–335',st:'high'},{n:'Vit E',v:'11,72',ref:'12–20',st:'low'}],
+     target:'AA:EPA < 3–4 (Entzündungsneigung senken)',
+     retest:'2026-10-12', retestLabel:'Stufe 6 · AA:EPA-Kontrolle', stop:'—'},
+    {key:'mg', name:'Magnesiumbisglycinat', dose:'3×1 g (ab 11.08. Test: 1× abends)',
+     markers:[],
+     target:'Zähneknirschen ↓ / Morgen-Stühle −1 / Dringlichkeit −1',
+     retest:'2026-08-24', retestLabel:'Stufe 2 · Mg-Einzeltest',
+     stop:'Kein Effekt → zurück auf 300 mg abendbetont'},
+    {key:'vitd', name:'Vitamin D3 + K2', dose:'1 Tropfen zum Frühstück',
+     markers:[{n:'25-OH-D',v:'49',ref:'im Rahmen',st:'ok'},{n:'K2-MK7',v:'2,28',ref:'0,13–1,47',st:'high'}],
+     target:'Vit D im Zielbereich halten',
+     retest:'2026-08-12', retestLabel:'Stufe 1 · Vit-D-Kontrolle', stop:'—',
+     safety:'K2-MK7 bereits erhöht → K2-Anteil/Dosis prüfen'},
+    {key:'ashwa', name:'Ashwagandha KSM-66', dose:'1 Kps morgens (war 4)',
+     markers:[{n:'Cortisol früh',v:'21,14',ref:'erhöht',st:'high'}],
+     target:'Stress/Schlaf, Cortisol-Morgenspitze senken',
+     retest:'2026-08-14', retestLabel:'Stufe 1 · Leber + TSH-Kontrolle',
+     stop:'Hepatotox-Signale / Schilddrüsen-Effekt → absetzen',
+     safety:'ALT/AST/GGT + TSH monitoren (Leber, Schilddrüse)'},
+    {key:'q10', name:'Coenzym Q10', dose:'1 Kps (100 mg)',
+     markers:[{n:'Q10',v:'746',ref:'750–1600',st:'low'}],
+     target:'Q10 in den Normbereich', retest:'', retestLabel:'', stop:'—'},
+    {key:'zink', name:'Zinkbisglycinat', dose:'15 mg (war 25)',
+     markers:[{n:'Zink',v:'587',ref:'normal',st:'ok'},{n:'Kupfer',v:'97,9',ref:'normal',st:'ok'}],
+     target:'', retest:'', retestLabel:'', stop:'',
+     note:'Kupfermangel-Hypothese widerlegt — Marker mittig normal. Reduktion/Streichung prüfen.'},
+    {key:'multi', name:'Das Multi', dose:'1 Kps zum Frühstück',
+     markers:[], target:'', retest:'', retestLabel:'', stop:'',
+     safety:'Trägt zu B6 (PLP 84,6, 2-fach) und Vit A (850) bei — genau den überhöhten Werten',
+     note:'Kein Marker, kein Zielwert. Beitrag zur B6-/A-Stapelung → streichen oder B6-/A-frei ersetzen.'},
+    {key:'cord', name:'Mico-Cord (Cordyceps)', dose:'2 morgens + 2 mittags',
+     markers:[], target:'', retest:'', retestLabel:'', stop:'',
+     note:'Verordnet, aber kein Marker/Zielsymptom hinterlegt → mit Arzt Ziel definieren oder streichen.'},
+    {key:'creatin', name:'Creatin', dose:'3–5 g zum Frühstück',
+     markers:[], target:'', retest:'', retestLabel:'', stop:'',
+     note:'Kein persönlicher Marker — allgemein gut belegt, Stufe-6-Kernstack-Kandidat. Zielsymptom eintragen oder als Basis akzeptieren.'}
+  ] };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -896,7 +972,8 @@ $('#icsBtn').addEventListener('click',exportIcs);
 /* ---------- Persistence ---------- */
 function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
 function load(){ try{ const d=JSON.parse(localStorage.getItem('atem')); if(d) Object.assign(state.settings,d); }catch(e){}
-  if((state.settings.planVer||0) < DEF.planVer){ state.settings.planText=DEF.planText; state.settings.planVer=DEF.planVer; save(); } }
+  if((state.settings.planVer||0) < DEF.planVer){ state.settings.planText=DEF.planText; state.settings.planVer=DEF.planVer; save(); }
+  if((state.settings.auditVer||0) < DEF.auditVer){ state.settings.audit=DEF.audit; state.settings.auditVer=DEF.auditVer; if(!state.settings.auditDone) state.settings.auditDone={}; save(); } }
 
 /* ============================================================
    HRV METRIC ENGINE (time + frequency domain)
@@ -1303,8 +1380,59 @@ function blocksHtml(text, showNow){
     return head+`<div class="pblock ${now?'now':''}"><h3><span>${esc(b.name)}</span><span>${now?'<span class="pnow">Jetzt</span>':''}<span class="ptime">${b.time||''}</span></span></h3>${items}${note}</div>`;
   }).join('');
 }
-function renderPlan(){ $('#planBlocks').innerHTML=blocksHtml(state.settings.planText,true); renderNutrition(); }
+function renderPlan(){ $('#planBlocks').innerHTML=blocksHtml(state.settings.planText,true); renderAudit(); renderNutrition(); }
 function renderNutrition(){ $('#nutritionBlocks').innerHTML=blocksHtml(state.settings.nutritionText,false); }
+/* ---------- Supplement↔Marker-Audit ---------- */
+function fmtDay(iso){ if(!iso) return ''; const p=String(iso).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:iso; }
+function auditStatus(s){
+  const today=new Date().toISOString().slice(0,10);
+  const done=(state.settings.auditDone||{})[s.key];
+  const hasMarker=(s.markers||[]).length>0, hasTarget=!!(s.target&&s.target.trim());
+  let level='ok';
+  if(!hasMarker && !hasTarget) level='strike';
+  else if(hasMarker && s.markers.every(m=>m.st==='ok') && !hasTarget) level='reduce';
+  const overdue = !!s.retest && s.retest<today && (!done || done<s.retest);
+  if(overdue && level==='ok') level='overdue';
+  const noCtrl = !s.retest && (hasMarker||hasTarget) && level==='ok';
+  const labels={strike:'Streich-Kandidat', reduce:'Reduktion prüfen', overdue:'Kontrolle überfällig', ok:'läuft'};
+  const flags=[{t:labels[level], c:level}];
+  if(overdue && level!=='overdue') flags.unshift({t:'Kontrolle überfällig', c:'overdue'});
+  if(noCtrl) flags.push({t:'kein Kontrolldatum', c:'warn'});
+  if(s.safety) flags.push({t:'Sicherheit', c:'safety'});
+  return {level, flags, overdue, done};
+}
+function renderAudit(){
+  const box=$('#planAudit'); if(!box) return;
+  const items=state.settings.audit||[]; if(!items.length){ box.innerHTML=''; return; }
+  const stats=items.map(s=>({s, ...auditStatus(s)}));
+  const nOver=stats.filter(x=>x.overdue).length, nStrike=stats.filter(x=>x.level==='strike').length,
+        nReduce=stats.filter(x=>x.level==='reduce').length, nWarn=stats.filter(x=>x.flags.some(f=>f.c==='warn')).length;
+  const sum=[];
+  if(nOver) sum.push(`<span class="ab overdue">${nOver} Kontrolle überfällig</span>`);
+  if(nStrike) sum.push(`<span class="ab strike">${nStrike} Streich-Kandidat${nStrike>1?'en':''}</span>`);
+  if(nReduce) sum.push(`<span class="ab reduce">${nReduce} Reduktion prüfen</span>`);
+  if(nWarn) sum.push(`<span class="ab warn">${nWarn} ohne Kontrolldatum</span>`);
+  if(!sum.length) sum.push(`<span class="ab ok">Alles im Rahmen</span>`);
+  box.innerHTML = `<div class="audit-sum">${sum.join(' ')}</div>` + stats.map(({s,flags,done})=>{
+    const badges=flags.map(f=>`<span class="ab ${f.c}">${esc(f.t)}</span>`).join(' ');
+    const markers=(s.markers||[]).map(m=>`<span class="mk ${m.st}">${esc(m.n)} ${esc(m.v)}${m.ref?` <i>(${esc(m.ref)})</i>`:''}</span>`).join('');
+    const rows=[];
+    if(markers) rows.push(`<div class="au-r"><b>Marker</b><div>${markers}</div></div>`);
+    if(s.target) rows.push(`<div class="au-r"><b>Ziel</b><div>${esc(s.target)}</div></div>`);
+    if(s.retest) rows.push(`<div class="au-r"><b>Kontrolle</b><div>${fmtDay(s.retest)}${s.retestLabel?` · ${esc(s.retestLabel)}`:''}</div></div>`);
+    if(s.stop && s.stop!=='—') rows.push(`<div class="au-r"><b>Abbruch</b><div>${esc(s.stop)}</div></div>`);
+    if(s.safety) rows.push(`<div class="au-r"><b>⚠️ Sicherheit</b><div>${esc(s.safety)}</div></div>`);
+    if(s.note) rows.push(`<div class="au-r"><b>Notiz</b><div>${esc(s.note)}</div></div>`);
+    const doneLine=done?`<span style="color:var(--dim); font-size:12px;">zuletzt geprüft ${fmtDay(done)}</span>`:'';
+    return `<div class="au-card l-${flags[0].c}"><div class="au-name">${esc(s.name)}${s.dose?` <small>· ${esc(s.dose)}</small>`:''}</div>`
+      + `<div class="au-badges">${badges}</div>${rows.join('')}`
+      + `<div class="au-foot"><button class="btn ghost xs" data-audit-done="${esc(s.key)}">Als geprüft markieren</button>${doneLine}</div></div>`;
+  }).join('');
+  box.querySelectorAll('[data-audit-done]').forEach(el=>el.addEventListener('click',()=>{
+    const k=el.dataset.auditDone; state.settings.auditDone=state.settings.auditDone||{};
+    state.settings.auditDone[k]=new Date().toISOString().slice(0,10); save(); renderAudit(); renderToday(); toast('Als geprüft markiert.');
+  }));
+}
 $('#nutriEditBtn').addEventListener('click',()=>{ $('#nutritionText').value=state.settings.nutritionText; $('#nutriEditor').classList.remove('hide'); $('#nutritionBlocks').classList.add('hide'); $('#nutriEditBtn').classList.add('hide'); });
 $('#nutriCancel').addEventListener('click',()=>{ $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); });
 $('#nutriSave').addEventListener('click',()=>{ state.settings.nutritionText=$('#nutritionText').value; save(); $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); renderNutrition(); toast('Ernährung gespeichert.'); });
@@ -1339,6 +1467,14 @@ function renderToday(){
   $('#todayHrv').innerHTML=`<h3><span>💓 HRV</span></h3><div class="pitem-info">${hrvLine}</div>`;
   const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
   const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
+  const ael=$('#todayAudit');
+  if(ael){ const ast=(state.settings.audit||[]).map(auditStatus), over=ast.filter(x=>x.overdue).length, strike=ast.filter(x=>x.level==='strike').length;
+    if(over||strike){ ael.classList.remove('hide');
+      ael.innerHTML=`<h3><span>🔍 Supplement-Check</span></h3><div class="pitem-info">`
+        +`${over?`<b style="color:#ef9a9a">${over} Kontrolle(n) überfällig</b>${strike?' · ':''}`:''}${strike?`${strike} Streich-Kandidat(en)`:''}`
+        +` <a id="toPlanAudit" style="color:var(--teal); cursor:pointer;">im Plan prüfen →</a></div>`;
+      const la=$('#toPlanAudit'); if(la) la.addEventListener('click',()=>switchMode('plan'));
+    } else { ael.classList.add('hide'); ael.innerHTML=''; } }
   renderMobility(); renderCheckin();
 }
 /* ---------- Tages-Check-in (Kontext-Log) ---------- */
@@ -1387,6 +1523,19 @@ function exportCC(){
   if(garmin.length) md+=`Garmin Nacht-HRV (letzte): ${garmin.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
   if(scans.length) md+=`Ruhemessung RMSSD (letzte): ${scans.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
   if(!garmin.length&&!scans.length) md+=`(keine HRV-Daten)\n`;
+  const audit=(state.settings.audit||[]).map(s=>({s, ...auditStatus(s)}));
+  if(audit.length){
+    const over=audit.filter(x=>x.overdue), strike=audit.filter(x=>x.level==='strike'),
+          reduce=audit.filter(x=>x.level==='reduce'), warn=audit.filter(x=>x.flags.some(f=>f.c==='warn')), safe=audit.filter(x=>x.s.safety);
+    md+=`\n## 💊 Supplement-Audit\n`;
+    if(over.length) md+=`- **Kontrolle überfällig:** ${over.map(x=>`${x.s.name} (fällig ${fmtDay(x.s.retest)})`).join(', ')}\n`;
+    if(strike.length) md+=`- **Streich-Kandidaten (kein Marker/Ziel):** ${strike.map(x=>x.s.name).join(', ')}\n`;
+    if(reduce.length) md+=`- **Reduktion/Streichung prüfen (Marker im Normbereich):** ${reduce.map(x=>x.s.name).join(', ')}\n`;
+    if(warn.length) md+=`- **Ohne Kontrolldatum:** ${warn.map(x=>x.s.name).join(', ')}\n`;
+    if(safe.length) md+=`- **Sicherheits-Monitoring:** ${safe.map(x=>`${x.s.name} — ${x.s.safety}`).join('; ')}\n`;
+    const next=audit.filter(x=>x.s.retest).sort((a,b)=>a.s.retest<b.s.retest?-1:1).slice(0,3);
+    if(next.length) md+=`- Nächste Kontrollen: ${next.map(x=>`${fmtDay(x.s.retest)} ${x.s.name}`).join(' · ')}\n`;
+  }
   md+=`\n_Bitte im Licht meines Gesundheitsprofils (PROFIL-STEFAN.md) auswerten und das Profil ggf. ergänzen._\n`;
   try{ if(navigator.clipboard) navigator.clipboard.writeText(md); }catch(e){}
   const blob=new Blob([md],{type:'text/markdown'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`atem-cc-uebergabe-${new Date().toISOString().slice(0,10)}.md`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
