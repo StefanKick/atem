@@ -183,7 +183,12 @@
   .ci-chip.on{background:var(--teal-dim); color:#fff; border-color:var(--teal);}
   .ci-in{flex:1; min-width:130px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:7px 10px; font-size:13px;}
   .ci-toggle{display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--txt); margin:9px 0;}
-  #planText{width:100%; height:340px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:10px 12px; font-size:13px; font-family:ui-monospace,Menlo,monospace; line-height:1.5;}
+  #planText, .editta{width:100%; height:340px; background:#0c1626; border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:10px 12px; font-size:13px; font-family:ui-monospace,Menlo,monospace; line-height:1.5;}
+  .rm-item{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-top:1px solid #1b2b45;}
+  .rm-item:first-of-type{border-top:none;}
+  .rm-when{font-size:12px; font-weight:700; flex:none; width:96px;}
+  .rm-main .t{font-size:14px;} .rm-main .n{font-size:11.5px; color:var(--dim);}
+  .rm-edit{font-size:12px; color:var(--teal); cursor:pointer;}
   .hide{display:none !important;}
   .toast{position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:#1d2c44; border:1px solid var(--line); color:var(--txt); padding:12px 18px; border-radius:12px; font-size:13px; z-index:50; opacity:0; transition:.3s; max-width:88vw; text-align:center;}
   .toast.show{opacity:1;}
@@ -263,6 +268,12 @@
   <div id="todayView" class="hide">
     <div id="todayGreet" style="font-size:15px; margin:2px 0 14px; text-align:center; color:var(--dim);"></div>
     <div id="todayReadiness"></div>
+    <div class="pblock" id="todayRoadmap"></div>
+    <div id="roadmapEditor" class="hide" style="margin-bottom:14px;">
+      <textarea id="roadmapText" class="editta" spellcheck="false" style="height:150px"></textarea>
+      <p class="hint">Format: <b>YYYY-MM-DD | Titel | Hinweis</b> — je Termin eine Zeile.</p>
+      <div class="row"><button class="btn sm" id="roadmapSave">Speichern</button><button class="btn ghost sm" id="roadmapCancel">Abbrechen</button></div>
+    </div>
     <div class="pblock" id="todaySupp"></div>
     <div class="pblock" id="todayAtem"></div>
     <div class="pblock" id="todayHrv"></div>
@@ -280,7 +291,15 @@
       <p class="hint">Format: <b># Gruppe</b> (Überschrift) · <b>## Blockname HH:MM</b> (Zeitblock) · <b>Mittel | Dosis</b> (Zeile) · <b>&gt; Hinweis</b> (Einnahme-Notiz). Alles frei änderbar.</p>
       <div class="row"><button class="btn sm" id="planSave">Speichern</button><button class="btn ghost sm" id="planCancel">Abbrechen</button></div>
     </div>
-    <p class="disclaimer">Dein persönlicher Plan — nur zur Info, keine medizinische Empfehlung. Dosierungen mit Arzt/Therapeut abstimmen.</p>
+    <div class="sec-h" style="margin-top:24px;">🍽️ Ernährung</div>
+    <div id="nutritionBlocks"></div>
+    <button class="btn ghost sm" id="nutriEditBtn" style="margin-top:12px; max-width:460px;">Ernährung bearbeiten</button>
+    <div id="nutriEditor" class="hide" style="margin-top:12px;">
+      <textarea id="nutritionText" class="editta" spellcheck="false"></textarea>
+      <p class="hint">Format: <b># Überschrift</b>, <b>## Block</b>, Zeilen als Empfehlung, <b>&gt; Hinweis</b>.</p>
+      <div class="row"><button class="btn sm" id="nutriSave">Speichern</button><button class="btn ghost sm" id="nutriCancel">Abbrechen</button></div>
+    </div>
+    <p class="disclaimer">Persönlicher Plan &amp; Ernährungs-Rahmen — nur zur Info, keine medizinische/ernährungstherapeutische Verordnung. Mit Arzt/Therapeut abstimmen.</p>
   </div>
 </main>
 
@@ -424,7 +443,34 @@ Bio Ashwagandha | 2 Kapseln
 Magnesiumbisglycinat | 1 g (1/3 TL)
 ## Vor dem Schlafengehen 22:00
 Magnesiumbisglycinat | 1 g (1/3 TL)
-> Einnahme: In einem halben Glas Wasser verrühren. Finale Dosis gegen das Zähneknirschen.` };
+> Einnahme: In einem halben Glas Wasser verrühren. Finale Dosis gegen das Zähneknirschen.`,
+              roadmapText:`2026-08-14 | Blutabnahme | Vit-D-Kontrolle + Kontrollwerte. ⚠️ Biotin ab 11.08. pausieren!
+2026-09-04 | Probiotika-Ende | Danach startet das Atemtest-Fenster.
+2026-09-21 | FODMAP-Start | H2/CH4-Atemtest MUSS davor liegen (Fenster 04.09.–21.09.).
+2026-11-30 | Stufenplan-Ende | 6-Stufen-Darm-Plan abgeschlossen.`,
+              nutritionText:`## Prinzipien
+Protein + Fett + Ballaststoffe zu jeder Mahlzeit | gegen das 15-Uhr-Tief
+Omega-3 hoch, verarbeitetes Fleisch runter | AA:EPA 9,6 senken
+Knoblauch/Zwiebel = Haupttrigger | als Öl statt Stücke, grüner Lauchteil
+Laktose (Milch/Buttermilch) | testweise laktosefrei/pflanzlich
+Reis gut verträglich | Weißmehl (Brezn) nie solo
+> Jetzt darmschonend & anti-entzündlich — noch NICHT streng Low-FODMAP (das startet 21.09., sonst verfälscht es den Atemtest).
+## Frühstück
+Haferflocken + Nüsse + laktosefreier Joghurt/Skyr + Beeren
+Alt.: Rührei + Gemüse | stressige Tage, mehr Protein
+> Milch → laktosefrei oder Mandeldrink. Magnesium in den Joghurt.
+## Mittag (Büro / Supermarkt)
+Salat + Hähnchen (Olivenöl) — öfter
+Bowl: Reis + Protein + Gemüse
+Vollkornbrot mit Ei/Käse/Hähnchen + Gemüse
+> Ziel ~30 g Protein. Statt Leberkässemmel/Brezn-solo: mit Protein/Fett kombinieren.
+## Abendessen (asiatisch — passt gut)
+Reis + Hähnchen · Pho · Zitronengrassuppe · PakChoi
+> Knoblauch in Öl anbraten + Stücke entfernen = Aroma ohne FODMAP. Nicht zu spät/schwer (Schlaf/Bruxismus).
+## Zwischenmahlzeit (~15 Uhr)
+Nüsse + dunkle Schoko ≥85 %
+Laktosefreier Joghurt · hartgekochtes Ei · Karotten
+> Protein/Fett statt Zucker — hält den Blutzucker stabil.` };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -1242,15 +1288,37 @@ function parsePlan(text){ const blocks=[]; let cur=null, group='';
     const p=l.replace(/^[-•\s]+/,'').split('|'); cur.items.push({name:(p[0]||'').trim(), dose:(p[1]||'').trim()}); });
   return blocks; }
 function currentBlockIdx(blocks){ const d=new Date(), nowM=d.getHours()*60+d.getMinutes(); let ci=-1; blocks.forEach((b,i)=>{ if(b.time){ const [h,m]=b.time.split(':').map(Number); if(h*60+m<=nowM) ci=i; } }); return ci<0?(blocks.length?0:-1):ci; }
-function renderPlan(){
-  const blocks=parsePlan(state.settings.planText), ci=currentBlockIdx(blocks); let lastGroup=null;
-  $('#planBlocks').innerHTML=blocks.map((b,i)=>{
+function blocksHtml(text, showNow){
+  const blocks=parsePlan(text), ci=showNow?currentBlockIdx(blocks):-1; let lastGroup=null;
+  return blocks.map((b,i)=>{
     let head=''; if(b.group && b.group!==lastGroup){ head=`<div class="pgroup">${esc(b.group)}</div>`; lastGroup=b.group; }
     const items=b.items.map(it=>`<div class="pitem"><span class="pdot">•</span><div class="pname">${esc(it.name)}${it.dose?` <small>· ${esc(it.dose)}</small>`:''}</div></div>`).join('');
     const note=b.note?`<div class="pnote">👉 ${esc(b.note)}</div>`:'';
-    return head+`<div class="pblock ${i===ci?'now':''}"><h3><span>${esc(b.name)}</span><span>${i===ci?'<span class="pnow">Jetzt</span>':''}<span class="ptime">${b.time||''}</span></span></h3>${items}${note}</div>`;
+    const now=i===ci;
+    return head+`<div class="pblock ${now?'now':''}"><h3><span>${esc(b.name)}</span><span>${now?'<span class="pnow">Jetzt</span>':''}<span class="ptime">${b.time||''}</span></span></h3>${items}${note}</div>`;
   }).join('');
 }
+function renderPlan(){ $('#planBlocks').innerHTML=blocksHtml(state.settings.planText,true); renderNutrition(); }
+function renderNutrition(){ $('#nutritionBlocks').innerHTML=blocksHtml(state.settings.nutritionText,false); }
+function parseRoadmap(text){ return (text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{ const p=l.split('|').map(s=>s.trim()); return {date:p[0]||'', title:p[1]||'', note:p[2]||''}; }).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)); }
+function renderRoadmap(){
+  const items=parseRoadmap(state.settings.roadmapText); const today=new Date(); today.setHours(0,0,0,0);
+  items.forEach(it=>{ it.d=new Date(it.date+'T00:00:00'); it.days=Math.round((it.d-today)/86400000); });
+  items.sort((a,b)=>a.d-b.d);
+  const rows=items.map(it=>{ let when,col;
+    if(it.days<0){ when='überfällig'; col='var(--bad)'; } else if(it.days===0){ when='heute'; col='var(--warn)'; }
+    else if(it.days<=14){ when=`in ${it.days} T`; col='var(--warn)'; } else { when=`in ${it.days} T`; col='var(--dim)'; }
+    const dstr=it.d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    return `<div class="rm-item"><div class="rm-when" style="color:${col}">${dstr}<br><span style="font-weight:400;font-size:11px">${when}</span></div><div class="rm-main"><div class="t">${esc(it.title)}</div>${it.note?`<div class="n">${esc(it.note)}</div>`:''}</div></div>`;
+  }).join('') || '<div class="rm-main"><div class="n">Keine Termine hinterlegt.</div></div>';
+  $('#todayRoadmap').innerHTML=`<h3><span>🗓️ Gesundheits-Fahrplan</span><span class="rm-edit" id="roadmapEditBtn">bearbeiten</span></h3>${rows}`;
+  const eb=$('#roadmapEditBtn'); if(eb) eb.addEventListener('click',()=>{ $('#roadmapText').value=state.settings.roadmapText; $('#roadmapEditor').classList.remove('hide'); $('#todayRoadmap').classList.add('hide'); });
+}
+$('#roadmapSave').addEventListener('click',()=>{ state.settings.roadmapText=$('#roadmapText').value; save(); $('#roadmapEditor').classList.add('hide'); $('#todayRoadmap').classList.remove('hide'); renderRoadmap(); toast('Fahrplan gespeichert.'); });
+$('#roadmapCancel').addEventListener('click',()=>{ $('#roadmapEditor').classList.add('hide'); $('#todayRoadmap').classList.remove('hide'); });
+$('#nutriEditBtn').addEventListener('click',()=>{ $('#nutritionText').value=state.settings.nutritionText; $('#nutriEditor').classList.remove('hide'); $('#nutritionBlocks').classList.add('hide'); $('#nutriEditBtn').classList.add('hide'); });
+$('#nutriCancel').addEventListener('click',()=>{ $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); });
+$('#nutriSave').addEventListener('click',()=>{ state.settings.nutritionText=$('#nutritionText').value; save(); $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); renderNutrition(); toast('Ernährung gespeichert.'); });
 function renderToday(){
   const d=new Date(), h=d.getHours(), greet=h<11?'Guten Morgen':(h<18?'Guten Tag':'Guten Abend');
   $('#todayGreet').innerHTML=`<b style="color:var(--txt)">${greet}.</b> ${d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})}`;
@@ -1271,7 +1339,7 @@ function renderToday(){
   $('#todayHrv').innerHTML=`<h3><span>💓 HRV</span></h3><div class="pitem-info">${hrvLine}</div>`;
   const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
   const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
-  renderCheckin();
+  renderRoadmap(); renderCheckin();
 }
 /* ---------- Tages-Check-in (Kontext-Log) ---------- */
 function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mode==='log'&&dayKey(r.ts)===dk)||null; }
