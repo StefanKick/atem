@@ -165,8 +165,10 @@ def main():
 
     if args.fetch:
         email = os.environ.get("GARMIN_EMAIL"); password = os.environ.get("GARMIN_PASSWORD")
-        if not email or not password:
-            print("Setze GARMIN_EMAIL und GARMIN_PASSWORD (env).", file=sys.stderr); sys.exit(2)
+        token = os.path.expanduser("~/.garminconnect")
+        if not (email and password) and not os.path.exists(token):
+            print("Kein Login-Token gefunden. Erst einmalig 'python3 garmin_login.py' ausfuehren "
+                  "(oder GARMIN_EMAIL/GARMIN_PASSWORD setzen).", file=sys.stderr); sys.exit(2)
         entries = fetch_from_garmin(args.days, email, password)
     elif args.csv:
         entries = parse_csv(args.csv)

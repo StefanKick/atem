@@ -1,34 +1,37 @@
-# Garmin Auto-Pull — Einrichtung (einmalig)
+# Garmin Auto-Pull — Einrichtung
 
-Zieht automatisch aus Garmin Connect: **Nacht-HRV, Ruhepuls, Sleep Score, Aktivitäten**
-→ schreibt eine JSON-Datei, die du in der Atem-App unter **Verlauf → Import** lädst.
-Läuft auf deinem Mac. Direkt-Bluetooth zur Uhr geht nicht (Sleep/Aktivitäten liegen nur in der Garmin-Cloud).
+Zieht aus Garmin Connect: **Nacht-HRV, Ruhepuls, Sleep Score, Aktivitäten**
+→ schreibt eine JSON, die du in der Atem-App unter **Verlauf → Import** lädst.
+Läuft auf deinem Mac. (Direkt-Bluetooth zur Uhr geht nicht — Sleep/Aktivitäten liegen nur in der Garmin-Cloud.)
 
-## 1. Bibliothek installieren (einmal, im Terminal)
-```bash
-pip3 install garminconnect
-```
+## ✅ Schon erledigt
+`garminconnect` ist installiert.
 
-## 2. Zugangsdaten setzen (deine, bleiben lokal)
-```bash
-export GARMIN_EMAIL="deine@mail.de"
-export GARMIN_PASSWORD="dein-garmin-passwort"
-```
-(Dauerhaft: die zwei Zeilen ans Ende von `~/.zshrc` hängen.)
-
-## 3. Erster Lauf (MFA-Code wird einmal abgefragt)
+## Schritt 1 — Einmaliger Login (Passwort nur am Prompt, wird NICHT gespeichert)
 ```bash
 cd ~/Documents/Claude/atem-app/tools
-python3 garmin_hrv_to_atem.py --fetch --days 28 \
-  -o ~/Library/Mobile\ Documents/com~apple~CloudDocs/atem-garmin.json
+python3 garmin_login.py
 ```
-Beim ersten Mal fragt Garmin einen **MFA-Code** ab (aus deiner Authenticator-App/SMS).
-Danach wird der Login-Token in `~/.garminconnect` gecacht → künftige Läufe ohne Abfrage.
+E-Mail, Passwort (unsichtbar) und ggf. den **MFA-Code** eingeben. Der Login-Token wird in
+`~/.garminconnect` gecacht → **ab jetzt kein Passwort mehr nötig.**
 
-Die JSON landet in **iCloud Drive** → auf dem Handy in der App **Verlauf → Import** öffnen. Import ist idempotent (mergt, keine Duplikate), du kannst also täglich neu ziehen und immer dieselbe Datei importieren.
+## Schritt 2 — Daten ziehen
+```bash
+cd ~/Documents/Claude/atem-app/tools
+python3 garmin_hrv_to_atem.py --fetch --days 28 -o ~/Documents/atem-garmin.json
+```
+Erzeugt `~/Documents/atem-garmin.json`.
 
-## 4. Täglich automatisch (optional, launchd)
-Datei `~/Library/LaunchAgents/com.atem.garmin.plist` anlegen:
+## Schritt 3 — In die App importieren (auf dem Handy)
+Die JSON aufs Handy bringen (AirDrop / iCloud Drive / an dich selbst mailen) und in der App
+**Verlauf → „Import"** öffnen. Import ist idempotent (mergt, keine Duplikate) — du kannst
+täglich neu ziehen und immer dieselbe Datei importieren.
+> Tipp: Wenn du iCloud Drive nutzt, gib in Schritt 2 einen iCloud-Pfad als `-o` an, dann liegt die
+> Datei automatisch auf dem Handy. (Bei dir war der Standard-iCloud-Ordner nicht vorhanden — ggf.
+> iCloud Drive in den Systemeinstellungen aktivieren.)
+
+## Schritt 4 — Täglich automatisch (optional, ohne Passwort in der Datei)
+`~/Library/LaunchAgents/com.atem.garmin.plist`:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -38,23 +41,16 @@ Datei `~/Library/LaunchAgents/com.atem.garmin.plist` anlegen:
     <string>/usr/bin/python3</string>
     <string>/Users/stefan.kick/Documents/Claude/atem-app/tools/garmin_hrv_to_atem.py</string>
     <string>--fetch</string><string>--days</string><string>7</string>
-    <string>-o</string>
-    <string>/Users/stefan.kick/Library/Mobile Documents/com~apple~CloudDocs/atem-garmin.json</string>
+    <string>-o</string><string>/Users/stefan.kick/Documents/atem-garmin.json</string>
   </array>
-  <key>EnvironmentVariables</key><dict>
-    <key>GARMIN_EMAIL</key><string>deine@mail.de</string>
-    <key>GARMIN_PASSWORD</key><string>dein-passwort</string>
-  </dict>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
 </dict></plist>
 ```
-Aktivieren:
 ```bash
 launchctl load ~/Library/LaunchAgents/com.atem.garmin.plist
 ```
-→ Läuft täglich 9:00, aktualisiert die iCloud-JSON. Du tippst in der App nur noch „Import".
+Läuft täglich 9:00, nutzt den gecachten Token (kein Passwort in der Datei).
 
 ## Troubleshooting
-- **Login/MFA schlägt fehl:** `rm -rf ~/.garminconnect` und Schritt 3 erneut.
-- **Feldnamen ändern sich bei Garmin:** Das Skript extrahiert defensiv (mehrere Fallbacks); falls Sleep/Aktivität leer bleiben, sag mir Bescheid, dann passe ich die Feldpfade an.
-- **Sicherheit:** Passwort steht dann in `~/.zshrc` bzw. der plist (nur lokal, dein Mac). Alternativ die zwei `export`-Zeilen manuell vor jedem Lauf eingeben.
+- **Login/Token abgelaufen:** `rm -rf ~/.garminconnect` und Schritt 1 erneut.
+- **Sleep/Aktivität leer:** Garmin ändert manchmal Feldnamen; sag Bescheid, dann passe ich die Feldpfade im Skript an.
