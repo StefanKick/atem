@@ -272,6 +272,12 @@
     <div class="pblock" id="todaySupp"></div>
     <div class="pblock" id="todayAtem"></div>
     <div class="pblock" id="todayHrv"></div>
+    <div class="pblock" id="todayMobility"></div>
+    <div id="mobilityEditor" class="hide" style="margin-bottom:14px;">
+      <textarea id="mobilityText" class="editta" spellcheck="false" style="height:180px"></textarea>
+      <p class="hint">Je Zeile eine Übung: <b>Name | Detail</b>. „Übung des Tages" rotiert automatisch.</p>
+      <div class="row"><button class="btn sm" id="mobSave">Speichern</button><button class="btn ghost sm" id="mobCancel">Abbrechen</button></div>
+    </div>
     <div class="pblock" id="todayCheckin"></div>
     <button class="btn ghost sm" id="ccExportBtn" style="margin-top:6px; max-width:460px;">🧠 An CC übergeben (Export)</button>
     <p class="disclaimer">Alles bleibt lokal auf dem Gerät. „An CC übergeben" bündelt geflaggte Punkte + Kontext als Datei, die du mit Claude (Cowork/CC) besprichst.</p>
@@ -460,7 +466,14 @@ Reis + Hähnchen · Pho · Zitronengrassuppe · PakChoi
 ## Zwischenmahlzeit (~15 Uhr)
 Nüsse + dunkle Schoko ≥85 %
 Laktosefreier Joghurt · hartgekochtes Ei · Karotten
-> Protein/Fett statt Zucker — hält den Blutzucker stabil.` };
+> Protein/Fett statt Zucker — hält den Blutzucker stabil.`,
+              mobilityText:`Chin Tucks | Kinn zurück ("Doppelkinn"), 10× 5 s halten — gegen Forward-Head
+Nacken-Dehnung | Ohr sanft Richtung Schulter, 30 s je Seite (linker Levator/Trapez)
+Brustwirbelsäule aufrichten | über die Stuhllehne strecken — der eigentliche Treiber
+Schulterblätter zusammenziehen | Rudern, gegen den Rundrücken
+Mikropause | alle 30–60 Min: Chin Tuck + Schultern kreisen
+Kiefer locker | tagsüber "Zähne locker, Zunge am Gaumen"
+FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahnschutz)` };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Reference norms (5-min, resting, spontaneous breathing) ---------- */
@@ -1293,6 +1306,17 @@ function renderNutrition(){ $('#nutritionBlocks').innerHTML=blocksHtml(state.set
 $('#nutriEditBtn').addEventListener('click',()=>{ $('#nutritionText').value=state.settings.nutritionText; $('#nutriEditor').classList.remove('hide'); $('#nutritionBlocks').classList.add('hide'); $('#nutriEditBtn').classList.add('hide'); });
 $('#nutriCancel').addEventListener('click',()=>{ $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); });
 $('#nutriSave').addEventListener('click',()=>{ state.settings.nutritionText=$('#nutritionText').value; save(); $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); renderNutrition(); toast('Ernährung gespeichert.'); });
+function parseMobility(text){ return (text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{ const p=l.split('|').map(s=>s.trim()); return {name:p[0]||'', detail:p[1]||''}; }); }
+function renderMobility(){
+  const items=parseMobility(state.settings.mobilityText); if(!items.length){ $('#todayMobility').innerHTML=''; return; }
+  const hi=items[Math.floor(Date.now()/86400000)%items.length];
+  const list=items.map(it=>`<div class="pitem-info">• ${esc(it.name)}${it.detail?` <span style="color:var(--dim)">· ${esc(it.detail)}</span>`:''}</div>`).join('');
+  $('#todayMobility').innerHTML=`<h3><span>🧎 Haltung & Kiefer</span><span style="font-size:12px;color:var(--teal);cursor:pointer" id="mobEditBtn">bearbeiten</span></h3>`
+    +`<div style="background:#15304e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:.5px">Übung des Tages</div><div style="font-size:14px;margin-top:2px"><b>${esc(hi.name)}</b>${hi.detail?` — ${esc(hi.detail)}`:''}</div></div>`+list;
+  const eb=$('#mobEditBtn'); if(eb) eb.addEventListener('click',()=>{ $('#mobilityText').value=state.settings.mobilityText; $('#mobilityEditor').classList.remove('hide'); $('#todayMobility').classList.add('hide'); });
+}
+$('#mobSave').addEventListener('click',()=>{ state.settings.mobilityText=$('#mobilityText').value; save(); $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); renderMobility(); toast('Übungen gespeichert.'); });
+$('#mobCancel').addEventListener('click',()=>{ $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); });
 function renderToday(){
   const d=new Date(), h=d.getHours(), greet=h<11?'Guten Morgen':(h<18?'Guten Tag':'Guten Abend');
   $('#todayGreet').innerHTML=`<b style="color:var(--txt)">${greet}.</b> ${d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})}`;
@@ -1313,7 +1337,7 @@ function renderToday(){
   $('#todayHrv').innerHTML=`<h3><span>💓 HRV</span></h3><div class="pitem-info">${hrvLine}</div>`;
   const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
   const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
-  renderCheckin();
+  renderMobility(); renderCheckin();
 }
 /* ---------- Tages-Check-in (Kontext-Log) ---------- */
 function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mode==='log'&&dayKey(r.ts)===dk)||null; }
@@ -1326,12 +1350,6 @@ function renderCheckin(){
    + ratingRow('Stimmung','mood',t.mood)
    + ratingRow('15-Uhr-Tief','dip',t.dip,0,3)
    + `<div class="ci-toggle"><span>Knirschen letzte Nacht</span><div class="switch ${t.bruxism?'on':''}" id="ciBrux"></div></div>`
-   + `<div class="ci-sec">Darm (für den Magnesium-Test)</div>`
-   + `<div class="ci-row"><span class="ci-lbl">Stühle früh</span><input class="ci-in" id="ciStools" type="number" min="0" max="12" inputmode="numeric" placeholder="Anzahl" value="${t.stools!=null?t.stools:''}" style="max-width:110px"></div>`
-   + ratingRow('Bristol','bristol',t.bristol,1,7)
-   + ratingRow('Dringlichkeit','urgency',t.urgency,0,3)
-   + ratingRow('Blähungen','bloating',t.bloating,0,3)
-   + ratingRow('Seitenstechen re.','flank',t.flank,0,3)
    + `<div class="ci-sec">Kontext</div>`
    + `<div class="ci-row"><span class="ci-lbl">Alkohol</span><input class="ci-in" id="ciAlcohol" placeholder="z. B. 2 Bier / nein" value="${esc(t.alcohol||'')}"></div>`
    + `<div class="ci-row"><span class="ci-lbl">Training</span><input class="ci-in" id="ciTraining" placeholder="z. B. 100 km Rad" value="${esc(t.training||'')}"></div>`
@@ -1347,7 +1365,6 @@ function renderCheckin(){
 function saveCheckin(){
   const getR=key=>{ const on=document.querySelector(`#todayCheckin .ci-chip[data-ci="${key}"].on`); return on?+on.dataset.v:null; };
   const rec={ sleepScore:getR('sleepScore'), mood:getR('mood'), dip:getR('dip'), bruxism:$('#ciBrux').classList.contains('on'),
-    stools: $('#ciStools').value!==''?+$('#ciStools').value:null, bristol:getR('bristol'), urgency:getR('urgency'), bloating:getR('bloating'), flank:getR('flank'),
     alcohol:$('#ciAlcohol').value.trim(), training:$('#ciTraining').value.trim(), symptoms:$('#ciSymptoms').value.trim(), note:$('#ciNote').value.trim(), flagCC:$('#ciFlag').classList.contains('on') };
   const h=loadHist(), dk=dayKey(Date.now()), ex=h.find(r=>r.mode==='log'&&dayKey(r.ts)===dk);
   if(ex){ Object.assign(ex,rec); } else { h.push({ts:Date.now(),mode:'log',...rec}); }
