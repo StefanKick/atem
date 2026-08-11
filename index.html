@@ -228,6 +228,8 @@
   .ins-t{font-size:14px; font-weight:600;}
   .ins-d{font-size:12px; color:var(--dim); margin-top:1px;}
   .ins-warn .ins-t{color:#e0b063;}
+  #resInterpret .ip{display:block; margin:7px 0; line-height:1.5;}
+  #resInterpret .ip:first-child{font-size:15px;}
   /* Kennzahlen-Cockpit (Verlauf) */
   .focus-box{background:linear-gradient(180deg,#1a2f22,#152a1f); border:1px solid #2c5a3c; border-radius:12px; padding:12px 14px; margin-bottom:12px;}
   .focus-box.good{background:linear-gradient(180deg,#15304e,#132437); border-color:var(--line);}
@@ -1191,7 +1193,7 @@ function openResult(r){
   drawReplay(r.series||{hr:[],coh:[]}, isScan, r.target);
   $('#replayTitle').textContent = isScan?'Verlauf: Puls':'Verlauf: Puls & Kohärenz';
   // interpretation + table
-  $('#resInterpret').innerHTML = interpretSession(r, isScan);
+  $('#resInterpret').innerHTML = isScan? interpretScan(r) : interpretSession(r, false);
   $('#metricRows').innerHTML = metricRows(r, isScan);
   document.querySelectorAll('#metricRows .mrow').forEach(el=>el.addEventListener('click',()=>{ const ex=$('#expl-'+el.dataset.mi); if(ex) ex.classList.toggle('open'); }));
   $('#resDisclaimer').innerHTML = isScan
@@ -1289,6 +1291,44 @@ function interpretSession(r,isScan){
   const z=r.zones||{}; p.push(`${z.high||0}% der Zeit warst du in hoher, ${z.mid||0}% in mittlerer, ${z.low||0}% in niedriger Kohärenz.`);
   if(r.rmssd) p.push(`Während der Übung: RMSSD ${r1(r.rmssd)} ms, RSA-getriebene LF-Power dominiert — genau das 0,1-Hz-Resonanzmuster, das den Vagus trainiert.`);
   return p.join(' ');
+}
+/* Ruhemessung: reiche, variierende, mitlernende Deutung (vergleicht mit deiner eigenen Historie) */
+function median(a){ if(!a.length) return null; const s=a.slice().sort((x,y)=>x-y), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+function pick(arr,i){ return arr[((i%arr.length)+arr.length)%arr.length]; }
+function pickN(arr,start,n){ const out=[]; for(let k=0;k<Math.min(n,arr.length);k++) out.push(arr[(start+k)%arr.length]); return out.join(' '); }
+function interpretScan(r){
+  const idx=Math.abs(Math.floor((r.ts||Date.now())/60000));
+  const prior=loadHist().filter(x=>x.mode==='scan'&&x.rmssd!=null&&x.ts<(r.ts||Infinity)).sort((a,b)=>a.ts-b.ts).map(x=>x.rmssd);
+  const v=r.rmssd, hr=r.meanHR, sdnn=r.sdnn, pnn=r.pnn50, lfhf=(r.lfhf!=null?r.lfhf:((r.lf&&r.hf)?r.lf/r.hf:null));
+  const P=[]; let statusCls='mid';
+  if(prior.length>=3){
+    const recent=prior.slice(-10), med=median(recent), best=Math.max(...prior), worst=Math.min(...prior), d=Math.round(v-med);
+    const belowPct=Math.round(prior.filter(x=>x<v).length/prior.length*100);
+    if(v>=best){ statusCls='good'; P.push(pick([`Das ist dein <b>höchster Ruhewert</b> bisher (${r1(v)} ms) — dein Nervensystem ist heute besonders erholt.`,`<b>Neuer Bestwert:</b> ${r1(v)} ms, über allen ${prior.length} bisherigen Messungen. Sehr gute parasympathische Reserve.`],idx)); }
+    else if(d>=5){ statusCls='good'; P.push(pick([`<b>${r1(v)} ms</b> liegt ${d} ms über deinem Schnitt (Ø ${r1(med)}) — für dich ein überdurchschnittlich erholter Tag.`,`Über deiner Baseline: <b>${r1(v)} ms</b> vs. dein Ø ${r1(med)} (+${d}). Guter Ausgangszustand für heute.`],idx)); }
+    else if(d<=-5){ statusCls='low'; P.push(pick([`<b>${r1(v)} ms</b> liegt ${Math.abs(d)} ms unter deinem Schnitt (Ø ${r1(med)}) — heute weniger erholt. Ein Einzeltag ist kein Drama, aber ein Signal, es ruhiger anzugehen.`,`Unter deiner Baseline: <b>${r1(v)} ms</b> vs. Ø ${r1(med)} (${d}). Typische Treiber: kurzer/unruhiger Schlaf, Alkohol, später oder harter Sport, Stress.`],idx)); }
+    else { statusCls='mid'; P.push(pick([`<b>${r1(v)} ms</b> entspricht fast genau deiner Baseline (Ø ${r1(med)}) — ein ausgeglichener Tag.`,`Auf deinem gewohnten Niveau: <b>${r1(v)} ms</b> (dein Ø ${r1(med)}). Stabil.`],idx)); }
+    const tr=trendPct(prior.concat(v));
+    if(tr!=null&&Math.abs(tr)>=6) P.push(tr>0?pick([`Dein Ruhe-HRV-Trend zeigt nach oben (<b>+${tr}%</b>) — Regelmäßigkeit zahlt sich aus.`,`Aufwärtstrend <b>+${tr}%</b>: dein Grund-Erholungszustand verbessert sich.`],idx):pick([`Der Trend zeigt zuletzt nach unten (<b>${tr}%</b>) — Schlaf und Belastung der letzten Tage lohnen einen Blick.`,`Abwärtstrend (<b>${tr}%</b>) — mehr Erholung, weniger späte Reize einplanen.`],idx));
+    if(prior.length>=6) P.push(`Einordnung: höher als <b>${belowPct}%</b> deiner bisherigen Messungen (Bestwert ${r1(best)}, tiefster ${r1(worst)} ms).`);
+  } else {
+    const rv=band(v,NORM.rmssd); statusCls=rv==='low'?'low':(rv==='good'?'good':'mid');
+    P.push(`${rv==='good'?`<b>${r1(v)} ms</b> ist überdurchschnittlich (Norm-Ø ${NORM.rmssd.mean}).`:rv==='low'?`<b>${r1(v)} ms</b> liegt unter dem Normbereich (${NORM.rmssd.lo}–${NORM.rmssd.hi}).`:`<b>${r1(v)} ms</b> liegt im Normbereich (${NORM.rmssd.lo}–${NORM.rmssd.hi}, Ø ${NORM.rmssd.mean}).`} Noch ${3-prior.length} Messung(en), dann vergleiche ich mit deiner <b>persönlichen Baseline</b> statt nur mit der Norm.`);
+  }
+  const facts=[];
+  if(hr!=null) facts.push(hr<58?`Ruhepuls niedrig (<b>${r1(hr)} bpm</b>) — spricht für gute Erholung/Fitness.`:hr>72?`Ruhepuls erhöht (<b>${r1(hr)} bpm</b>) — mit niedriger HRV oft ein Zeichen von Untererholung.`:`Ruhepuls <b>${r1(hr)} bpm</b> — solide.`);
+  if(lfhf!=null) facts.push(lfhf>3?`Sympatho-vagale Balance sympathisch betont (LF/HF ${lfhf.toFixed(1)}) — Anspannung überwiegt.`:lfhf<0.6?`Stark parasympathisch (LF/HF ${lfhf.toFixed(1)}) — sehr entspannt.`:`Sympatho-vagale Balance ausgewogen (LF/HF ${lfhf.toFixed(1)}).`);
+  if(pnn!=null) facts.push(`pNN50 <b>${pnn.toFixed(0)}%</b> — Anteil stark schwankender Schläge, ${pnn>=10?'gute':'geringe'} vagale Aktivität.`);
+  if(sdnn!=null) facts.push(`Gesamtvariabilität SDNN <b>${r1(sdnn)} ms</b> (${band(sdnn,NORM.sdnn)==='low'?'eher niedrig':'solide'}).`);
+  if(facts.length) P.push(pickN(facts, idx%facts.length, 2));
+  const act = statusCls==='low'? pick(['<b>Heute schonen:</b> Resonanzatmung, leichte Bewegung, früh ins Bett — kein hartes Intervalltraining.','<b>Erholung priorisieren:</b> der Körper meldet Untererholung. Schlaf schützen, Koffein/Alkohol runter.'],idx)
+    : statusCls==='good'? pick(['<b>Guter Tag für Belastung</b>, wenn du magst — Reserven sind da.','Grünes Licht: der Körper ist bereit, falls ein intensiveres Training ansteht.'],idx)
+    : pick(['<b>Solider Tag</b> — normal weitermachen, auf konstanten Schlaf achten.','Ausgeglichen: Routine halten, etwas Atemtraining schadet nie.'],idx);
+  const extra=[];
+  if(r.quality!=null&&r.quality<70) extra.push(`Signalqualität nur ${r.quality}% — vor der Messung Gurt-Elektroden anfeuchten und 1 Min ruhig sitzen, dann wird der Wert verlässlicher.`);
+  extra.push(pick(['Für die tiefe Deutung: „An CC übergeben" tippen und mit Claude Werte + Kontext (Schlaf, Alkohol, Sport) gemeinsam einordnen.','Am aussagekräftigsten: regelmäßig zur gleichen Zeit messen (morgens, im Sitzen).','Mach den Check-in bei Claude — dort ordnen wir HRV, Schlaf und Supplements zusammen ein.'],idx+1));
+  P.push(act+' '+extra.join(' '));
+  return P.map(x=>`<span class="ip">${x}</span>`).join('');
 }
 
 /* ============================================================
@@ -1764,7 +1804,8 @@ function exportCC(){
   else md+=`- (keine Check-ins)\n`;
   md+=`\n## HRV\n`;
   if(garmin.length) md+=`Garmin Nacht-HRV (letzte): ${garmin.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
-  if(scans.length) md+=`Ruhemessung RMSSD (letzte): ${scans.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
+  if(scans.length){ md+=`Ruhemessung RMSSD (letzte): ${scans.map(r=>Math.round(r.rmssd)).join(', ')} ms\n`;
+    const ls=scans[scans.length-1]; md+=`Letzte Ruhemessung im Detail: RMSSD ${Math.round(ls.rmssd)} ms${ls.sdnn!=null?`, SDNN ${Math.round(ls.sdnn)}`:''}${ls.meanHR!=null?`, Ø Puls ${Math.round(ls.meanHR)} bpm`:''}${ls.lfhf!=null?`, LF/HF ${ls.lfhf.toFixed(1)}`:''}${ls.pnn50!=null?`, pNN50 ${ls.pnn50.toFixed(0)}%`:''}${ls.quality!=null?`, Qualität ${ls.quality}%`:''}\n`; }
   if(!garmin.length&&!scans.length) md+=`(keine HRV-Daten)\n`;
   const audit=(state.settings.audit||[]).map(s=>({s, ...auditStatus(s)}));
   if(audit.length){
