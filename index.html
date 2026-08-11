@@ -228,6 +228,32 @@
   .ins-t{font-size:14px; font-weight:600;}
   .ins-d{font-size:12px; color:var(--dim); margin-top:1px;}
   .ins-warn .ins-t{color:#e0b063;}
+  /* Kennzahlen-Cockpit (Verlauf) */
+  .focus-box{background:linear-gradient(180deg,#1a2f22,#152a1f); border:1px solid #2c5a3c; border-radius:12px; padding:12px 14px; margin-bottom:12px;}
+  .focus-box.good{background:linear-gradient(180deg,#15304e,#132437); border-color:var(--line);}
+  .focus-h{font-size:12px; color:#7fc79b; text-transform:uppercase; letter-spacing:.5px; margin-bottom:5px;}
+  .focus-box.good .focus-h{color:var(--teal);}
+  .focus-i{font-size:13px; line-height:1.45; margin:4px 0;}
+  .kpi-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;}
+  .kpi{background:#0f1f33; border:1px solid var(--line); border-left:3px solid var(--line); border-radius:10px; padding:9px 11px;}
+  .kpi.st-warn{border-left-color:#ef9a9a;} .kpi.st-good{border-left-color:#7fc79b;} .kpi.st-ok{border-left-color:#5fb0ff;}
+  .kpi-top{display:flex; justify-content:space-between; align-items:baseline; gap:6px;}
+  .kpi-n{font-size:12px; color:var(--dim); font-weight:600;}
+  .kpi-tr{font-size:11px; white-space:nowrap;} .kpi-tr.up{color:#7fc79b;} .kpi-tr.dn{color:#ef9a9a;} .kpi-tr.flat{color:var(--dim);}
+  .kpi-v{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; margin:2px 0;}
+  .kpi-v small{font-size:12px; color:var(--dim); font-weight:400; margin-left:2px;}
+  .kpi-s{font-size:11px; color:var(--dim);}
+  .kpi-vd{font-size:12px; margin-top:3px; line-height:1.35;}
+  /* Heute-Akkordeon */
+  .acc-block{margin-bottom:14px;}
+  .acc-block>summary{list-style:none; cursor:pointer; padding:12px 14px; background:#12253d; border:1px solid var(--line); border-radius:12px; font-weight:600; font-size:15px; display:flex; justify-content:space-between; align-items:center;}
+  .acc-block>summary::-webkit-details-marker{display:none;}
+  .acc-block>summary::after{content:'▾'; color:var(--dim); margin-left:8px;}
+  .acc-block[open]>summary{border-radius:12px 12px 0 0; border-bottom:none;}
+  .acc-block[open]>summary::after{content:'▴';}
+  .acc-sub{margin-top:8px;}
+  .acc-sub>summary{list-style:none; cursor:pointer; color:var(--teal); font-size:12px;}
+  .acc-sub>summary::-webkit-details-marker{display:none;}
   .rm-item{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-top:1px solid #1b2b45;}
   .rm-item:first-of-type{border-top:none;}
   .rm-when{font-size:12px; font-weight:700; flex:none; width:96px;}
@@ -290,7 +316,7 @@
       <div class="h-card"><div class="v" id="hcStreak">0</div><div class="l">Serie (Tage)</div></div>
       <div class="h-card"><div class="v" id="hcRmssd">–</div><div class="l" id="hcRmssdLbl">Ø RMSSD Ruhe (5)</div></div>
     </div>
-    <div class="interpret" id="histInterpret"></div>
+    <div id="kpiCockpit"></div>
     <div class="trend-seg" id="trendSeg"></div>
     <div class="spark-box" id="sparkBox"><div class="t"><span id="sparkTitle">Trend</span><span id="sparkMeta"></span></div><canvas id="sparkMain"></canvas></div>
     <div class="sec-h">Sitzungen (tippen für Auswertung)</div>
@@ -324,7 +350,7 @@
       <p class="hint">Je Zeile eine Übung: <b>Name | Detail</b>. „Übung des Tages" rotiert automatisch.</p>
       <div class="row"><button class="btn sm" id="mobSave">Speichern</button><button class="btn ghost sm" id="mobCancel">Abbrechen</button></div>
     </div>
-    <div class="pblock" id="todayCheckin"></div>
+    <details class="acc-block" id="checkinAcc"><summary>📝 Tages-Check-in<span id="checkinStatus" style="font-size:12px;color:var(--teal);font-weight:400;margin-left:auto;margin-right:8px;"></span></summary><div id="todayCheckin" style="background:#12253d; border:1px solid var(--line); border-top:none; border-radius:0 0 12px 12px; padding:12px 14px;"></div></details>
     <button class="btn ghost sm" id="ccExportBtn" style="margin-top:6px; max-width:460px;">🧠 An CC übergeben (Export)</button>
     <p class="disclaimer">Alles bleibt lokal auf dem Gerät. „An CC übergeben" bündelt geflaggte Punkte + Kontext als Datei, die du mit Claude (Cowork/CC) besprichst.</p>
   </div>
@@ -1287,7 +1313,7 @@ function renderHistory(){
   $('#hcSessions').textContent=active.length; $('#hcMinutes').textContent=totalMin; $('#hcStreak').textContent=computeStreak(active);
   if(garmins.length){ const g=garmins[garmins.length-1]; $('#hcRmssd').textContent=(g.g7!=null?g.g7:Math.round(g.rmssd)); $('#hcRmssdLbl').textContent='Garmin 7-Tage HRV'; }
   else { const last5=scans.slice(-5); const avgR=last5.length?Math.round(last5.reduce((s,r)=>s+r.rmssd,0)/last5.length):null; $('#hcRmssd').textContent=avgR!=null?avgR:'–'; $('#hcRmssdLbl').textContent='Ø RMSSD Ruhe (5)'; }
-  $('#histInterpret').innerHTML=buildInterpretation(h,scans,garmins);
+  $('#kpiCockpit').innerHTML=buildKpiCockpit(h);
   renderReadiness(h);
   // trend selector
   $('#trendSeg').innerHTML=TRENDS.map((t,i)=>`<button class="${i===curTrend?'on':''}" data-i="${i}">${t.n}</button>`).join('');
@@ -1367,6 +1393,46 @@ function buildInterpretation(h,scans,garmins){
   const hrv=h.filter(r=>r.mode==='hrv'&&r.success!=null);
   if(hrv.length>=4){ const st=trendPct(hrv.map(r=>r.success)); if(st>5) p.push(`Übungserfolg wächst <span class="arrow-up">+${st}%</span> — du triffst deine Resonanz besser.`); }
   return p.join(' ');
+}
+/* ---------- Kennzahlen-Cockpit (Verlauf, interpretiert) ---------- */
+function kpiTr(vals, inv){ if(!vals||vals.length<3) return null; const pct=trendPct(vals); if(pct==null) return null;
+  const up=pct>0, flat=Math.abs(pct)<=3, good=inv?!up:up, arrow=flat?'→':(up?'↑':'↓');
+  return {txt:`${arrow} ${Math.abs(pct)}%`, cls: flat?'flat':(good?'up':'dn')}; }
+function buildKpiCockpit(h){
+  const now=Date.now(), D=86400000, r1=Math.round;
+  const gar=h.filter(r=>r.mode==='garmin'&&r.rmssd!=null).sort((a,b)=>a.ts-b.ts);
+  const slp=h.filter(r=>r.mode==='sleep'&&r.score!=null).sort((a,b)=>a.ts-b.ts);
+  const scan=h.filter(r=>r.mode==='scan'&&r.rmssd!=null).sort((a,b)=>a.ts-b.ts);
+  const hrv=h.filter(r=>r.mode==='hrv'&&r.success!=null).sort((a,b)=>a.ts-b.ts);
+  const rhr=gar.filter(r=>r.rhr!=null);
+  const active=h.filter(r=>ACTIVE_MODES.includes(r.mode));
+  if(!gar.length && !slp.length && !scan.length && !hrv.length)
+    return `<div class="interpret">Sobald du deine Garmin-Daten importierst oder eine Ruhemessung/HRV-Übung machst, zeige ich hier deine Kennzahlen mit Deutung und einem klaren Fokus.</div>`;
+  const rows=[], focus=[];
+  if(gar.length){ const last=gar[gar.length-1], v=last.g7!=null?last.g7:last.rmssd, t=kpiTr(gar.slice(-10).map(x=>x.rmssd));
+    let st='ok', vd;
+    if(last.baseLo&&last.baseHi){ if(last.rmssd<last.baseLo){st='warn';vd=`zuletzt ${r1(last.rmssd)} ms, unter Baseline ${last.baseLo}–${last.baseHi}`;} else if(last.rmssd>last.baseHi){st='good';vd=`über Baseline ${last.baseLo}–${last.baseHi} — gut erholt`;} else {st='ok';vd=`zuletzt ${r1(last.rmssd)} ms, in Baseline ${last.baseLo}–${last.baseHi}`;} }
+    else vd='persönlicher Trend zählt';
+    rows.push({n:'HRV Nacht',s:'Garmin · 7-Tage-Ø',v:r1(v),u:'ms',t,st,vd});
+    if(st==='warn'||(t&&t.cls==='dn')) focus.push('Nächtliche HRV niedrig oder fallend — Schlaf, Alkohol und die Trainingslast der Vortage sind die Stellschrauben; morgens/abends 5 Min Resonanzatmung.'); }
+  if(slp.length){ const last=slp[slp.length-1], a7=slp.slice(-7).map(x=>x.score), m=a7.reduce((x,y)=>x+y,0)/a7.length, t=kpiTr(slp.slice(-10).map(x=>x.score));
+    const st=m>=75?'good':(m>=60?'ok':'warn');
+    rows.push({n:'Schlaf-Score',s:'Garmin · 7-Tage-Ø',v:r1(m),u:'',t,st,vd:`zuletzt ${r1(last.score)}${last.hours?` · ${last.hours} h`:''}`});
+    if(st==='warn') focus.push('Schlaf-Score im unteren Bereich — dein größter HRV-Hebel. Feste Schlafzeiten, abends leichter und früher essen, Screen-Zeit runter.'); }
+  if(rhr.length){ const last=rhr[rhr.length-1], t=kpiTr(rhr.slice(-10).map(x=>x.rhr), true);
+    rows.push({n:'Ruhepuls',s:'Garmin',v:r1(last.rhr),u:'bpm',t,st:'ok',vd:'niedriger = erholter'}); }
+  if(scan.length){ const last=scan[scan.length-1], t=kpiTr(scan.slice(-10).map(x=>x.rmssd));
+    const st=last.rmssd<NORM.rmssd.lo?'warn':(last.rmssd>NORM.rmssd.hi?'good':'ok');
+    rows.push({n:'Ruhe-RMSSD',s:'Polar-Messung',v:r1(last.rmssd),u:'ms',t,st,vd:`Norm ${NORM.rmssd.lo}–${NORM.rmssd.hi} ms`}); }
+  { const hrv30=hrv.filter(r=>r.ts>=now-30*D), streak=computeStreak(active), t=kpiTr(hrv.slice(-10).map(x=>x.success));
+    const st=hrv30.length>=8?'good':(hrv30.length>=3?'ok':'warn');
+    rows.push({n:'HRV-Übungen',s:'Resonanz-Training',v:hrv30.length,u:'/30T',t,st,vd:`Serie ${streak} Tag${streak===1?'':'e'}${t?` · Erfolg ${t.txt}`:''}`});
+    if(hrv30.length<8) focus.push(`Erst ${hrv30.length} HRV-Übungen in 30 Tagen — Regelmäßigkeit (Ziel ~4–5/Woche) hebt die HRV stärker als einzelne lange Einheiten.`); }
+  const focusHtml = focus.length
+    ? `<div class="focus-box"><div class="focus-h">🎯 Woran arbeiten</div>${focus.slice(0,3).map(f=>`<div class="focus-i">${esc(f)}</div>`).join('')}</div>`
+    : `<div class="focus-box good"><div class="focus-h">🎯 Woran arbeiten</div><div class="focus-i">Deine Kennzahlen sind im grünen Bereich — Kurs halten: Konstanz bei Schlaf, Atemübung und moderatem Training.</div></div>`;
+  const grid = `<div class="kpi-grid">`+rows.map(r=>`<div class="kpi st-${r.st}"><div class="kpi-top"><span class="kpi-n">${esc(r.n)}</span>${r.t?`<span class="kpi-tr ${r.t.cls}">${r.t.txt}</span>`:''}</div><div class="kpi-v">${r.v}${r.u?`<small>${esc(r.u)}</small>`:''}</div><div class="kpi-s">${esc(r.s)}</div><div class="kpi-vd">${esc(r.vd)}</div></div>`).join('')+`</div>`;
+  return focusHtml+grid;
 }
 function drawSpark(sel,vals,color){
   const cv=$(sel); if(!cv) return; const dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect(), W=r.width||300, H=r.height||56;
@@ -1609,7 +1675,8 @@ function renderMobility(){
   const hi=items[Math.floor(Date.now()/86400000)%items.length];
   const list=items.map(it=>`<div class="pitem-info">• ${esc(it.name)}${it.detail?` <span style="color:var(--dim)">· ${esc(it.detail)}</span>`:''}</div>`).join('');
   $('#todayMobility').innerHTML=`<h3><span>🧎 Haltung & Kiefer</span><span style="font-size:12px;color:var(--teal);cursor:pointer" id="mobEditBtn">bearbeiten</span></h3>`
-    +`<div style="background:#15304e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:.5px">Übung des Tages</div><div style="font-size:14px;margin-top:2px"><b>${esc(hi.name)}</b>${hi.detail?` — ${esc(hi.detail)}`:''}</div></div>`+list;
+    +`<div style="background:#15304e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:.5px">Übung des Tages</div><div style="font-size:14px;margin-top:2px"><b>${esc(hi.name)}</b>${hi.detail?` — ${esc(hi.detail)}`:''}</div></div>`
+    +`<details class="acc-sub"><summary>alle Übungen anzeigen</summary><div style="margin-top:6px;">${list}</div></details>`;
   const eb=$('#mobEditBtn'); if(eb) eb.addEventListener('click',()=>{ $('#mobilityText').value=state.settings.mobilityText; $('#mobilityEditor').classList.remove('hide'); $('#todayMobility').classList.add('hide'); });
 }
 $('#mobSave').addEventListener('click',()=>{ state.settings.mobilityText=$('#mobilityText').value; save(); $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); renderMobility(); toast('Übungen gespeichert.'); });
@@ -1627,11 +1694,14 @@ function renderToday(){
       + (cb.note?`<div class="pnote">👉 ${esc(cb.note)}</div>`:'')
       + `<div style="margin-top:10px;"><a id="toPlan" style="color:var(--teal); cursor:pointer; font-size:13px;">Kompletter Plan →</a></div>` : '<div class="pitem-info" style="color:var(--dim)">Kein Plan hinterlegt.</div>';
   const dk=dayKey(Date.now()), todays=loadHist().filter(x=>ACTIVE_MODES.includes(x.mode)&&dayKey(x.ts)===dk), mins=Math.round(todays.reduce((s,x)=>s+(x.dur||0),0)/60);
-  $('#todayAtem').innerHTML=`<h3><span>🫁 Atem heute</span></h3><div class="pitem-info">${todays.length?`✓ ${todays.length} Übung(en) · ${mins} Min`:'Noch keine Übung heute'}</div><div style="margin-top:10px;"><button class="btn sm" id="toAtem" style="max-width:240px;">Resonanz-Atmung starten</button></div>`;
-  const g=loadHist().filter(x=>x.mode==='garmin'&&x.rmssd!=null), sc=loadHist().filter(x=>x.mode==='scan'&&x.rmssd!=null); let hrvLine='Noch keine HRV-Daten.';
-  if(g.length){ const lg=g[g.length-1]; hrvLine=`Nacht-HRV ${Math.round(lg.rmssd)} ms${lg.g7!=null?` · 7-Tage-Ø ${lg.g7}`:''} <span style="color:var(--dim)">(${fmtDate(lg.ts)})</span>`; }
+  const g=loadHist().filter(x=>x.mode==='garmin'&&x.rmssd!=null), sc=loadHist().filter(x=>x.mode==='scan'&&x.rmssd!=null); let hrvLine='noch keine HRV-Daten';
+  if(g.length){ const lg=g[g.length-1]; hrvLine=`Nacht-HRV ${Math.round(lg.rmssd)} ms${lg.g7!=null?` · Ø7 ${lg.g7}`:''} <span style="color:var(--dim)">(${fmtDate(lg.ts)})</span>`; }
   else if(sc.length){ const ls=sc[sc.length-1]; hrvLine=`Ruhe-RMSSD ${Math.round(ls.rmssd)} ms <span style="color:var(--dim)">(${fmtDate(ls.ts)})</span>`; }
-  $('#todayHrv').innerHTML=`<h3><span>💓 HRV</span></h3><div class="pitem-info">${hrvLine}</div>`;
+  $('#todayAtem').innerHTML=`<h3><span>🫁 Atem & HRV</span></h3>`
+    +`<div class="pitem-info">Atem heute: ${todays.length?`✓ ${todays.length} Übung(en) · ${mins} Min`:'noch keine'}</div>`
+    +`<div class="pitem-info">HRV: ${hrvLine}</div>`
+    +`<div style="margin-top:10px;"><button class="btn sm" id="toAtem" style="max-width:240px;">Resonanz-Atmung starten</button></div>`;
+  $('#todayHrv').innerHTML=''; $('#todayHrv').style.display='none';
   const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
   const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
   const ael=$('#todayAudit');
@@ -1649,8 +1719,8 @@ function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mo
 function ratingRow(label,key,val,lo,hi){ lo=lo==null?1:lo; hi=hi==null?5:hi; let c=''; for(let i=lo;i<=hi;i++) c+=`<div class="ci-chip ${val===i?'on':''}" data-ci="${key}" data-v="${i}">${i}</div>`; return `<div class="ci-row"><span class="ci-lbl">${label}</span>${c}</div>`; }
 function renderCheckin(){
   const t=todayLog()||{};
-  $('#todayCheckin').innerHTML=`<h3><span>📝 Tages-Check-in</span><span class="ptime">${t.ts?'✓ heute':''}</span></h3>`
-   + `<div class="ci-sec">Zustand</div>`
+  const cs=$('#checkinStatus'); if(cs) cs.textContent = t.ts?'✓ heute':'offen';
+  $('#todayCheckin').innerHTML=`<div class="ci-sec" style="border-top:none; padding-top:0; margin-top:0;">Zustand</div>`
    + ratingRow('Schlaf','sleepScore',t.sleepScore)
    + ratingRow('Stimmung','mood',t.mood)
    + ratingRow('15-Uhr-Tief','dip',t.dip,0,3)
