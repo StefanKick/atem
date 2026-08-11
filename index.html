@@ -423,7 +423,7 @@
     <p class="hint">Tief durch die Nase einatmen → kurz nachziehen → lang durch den Mund ausatmen. Bei Seitenstechen 3–4×.</p>
   </div>
   <div id="hrvSettings" class="hide">
-    <p class="hint" style="margin-bottom:14px;">Training nutzt deinen Resonanz-Rhythmus (<span id="hrvRateEcho">4–6</span>, oben im Resonanz-Tab änderbar). Ruhemessung = still sitzen, normal atmen.</p>
+    <p class="hint" style="margin-bottom:14px;"><b>Training</b> = langsam mit dem Kreis atmen (<span id="hrvRateEcho">4–6</span>, im Resonanz-Tab änderbar) → hebt die HRV aktiv, trainiert den Vagus. <b>Ruhemessung</b> = einfach still sitzen und <b>ganz normal atmen</b> (nicht steuern!) → misst deine echte Baseline, mit Normwerten vergleichbar. Zwei verschiedene Dinge: das eine bewegt den Wert, das andere liest ihn ab.</p>
     <div class="field" id="hrvDurField"><label>Training-Dauer <b><span id="hrvDurVal">5</span> Min</b></label><input type="range" id="hrvDurRange" min="1" max="45" step="1" value="5"></div>
     <div class="toggle" style="border-top:none; padding-top:0;"><span>Training ohne Zeitlimit</span><div class="switch" id="swHrvNoLimit"></div></div>
     <div class="field" style="margin-top:8px;"><label>Ruhemessung-Dauer <b><span id="scanDurVal">3</span> Min</b></label><input type="range" id="scanDurRange" min="1" max="10" step="1" value="3"></div>
@@ -813,7 +813,7 @@ function startScan(){
   const durMs=state.settings.scanDurMin*60*1000, t0=performance.now();
   engine={timer:null,raf:null}; startRec('scan'); startAmbient();
   const pulseMode = state.settings.scanStyle==='pulse';
-  phaseLabel.textContent='Ruhemessung'; subLabel.textContent = pulseMode? 'Ruhig sitzen — der Kreis folgt deinem Puls' : 'Ruhig sitzen, normal atmen — nicht sprechen';
+  phaseLabel.textContent='Ruhemessung'; subLabel.textContent = 'Atme ganz normal — nicht steuern, nicht langsamer. Nicht sprechen.';
   setScale(orb,.7,2); setScale(orbCore,.6,2); orb.style.filter='brightness(1)';
   function tick(){ const now=performance.now(), el=now-t0, rem=Math.max(0,durMs-el); $('#hrvTime').textContent=fmt(rem);
     if(pulseMode && hrSeries.length>=4){
@@ -823,13 +823,19 @@ function startScan(){
       const cur=hrSeries[hrSeries.length-1].hr; const norm=Math.max(0,Math.min(1,(cur-lo)/(hi-lo)));
       const scale=0.45+norm*0.55; orb.style.transition='transform .35s ease-out, filter .35s ease'; orb.style.transform=`scale(${scale.toFixed(3)})`;
       const prev=hrSeries.find(p=>now-p.t>=1500); const rising = prev? cur>prev.hr : true;
-      orb.style.filter = rising? 'brightness(1.3) saturate(1.2)' : 'brightness(.8)';
-      phaseLabel.textContent = rising? 'Einatmen ↑' : 'Ausatmen ↓'; countNum.textContent='';
+      orb.style.filter = rising? 'brightness(1.15)' : 'brightness(.85)';
+      phaseLabel.textContent = 'Ruhemessung'; countNum.textContent='';
     } else {
       const p=0.66+0.04*Math.sin(el/1400); orb.style.transition='transform .1s linear'; orb.style.transform=`scale(${p})`;
       phaseLabel.textContent = pulseMode? 'Warte auf Puls…' : 'Ruhemessung';
       countNum.textContent=Math.ceil(rem/1000/60)+"'";
     }
+    // Live-Feedback (wie beim Training, aber OHNE Atem-Vorgabe): du siehst deine Ruhe-HRV entstehen
+    const li=$('#liveInterpret');
+    if(li){ if(rrLive.length>=4){ const tot=rec?(rec.good+rec.bad):0, q=tot?Math.round(rec.good/tot*100):0;
+        const qn = q>=80?'Signal stabil ✓':(q>=50?'Signal ok':'Signal unruhig — Gurt anfeuchten, ruhig sitzen');
+        li.innerHTML=`Deine Ruhe-HRV baut sich auf: <b>RMSSD ~${Math.round(liveRmssd)} ms</b> · ${qn}`; li.style.color='var(--txt)'; }
+      else { li.textContent='Warte auf den Herzschlag … Polar verbunden?'; li.style.color='var(--dim)'; } }
     if(rem<=0){ finishHrv(el); return; } engine.raf=requestAnimationFrame(tick); }
   engine._meta={isHrv:true,scan:true,breaths:()=>0,elapsed:()=>performance.now()-t0};
   tick();
@@ -1007,7 +1013,7 @@ function applyHrvSub(){
   $('#segTrain').classList.toggle('on',!scan); $('#segScan').classList.toggle('on',scan);
   $('#cohWrap').classList.toggle('hide',scan);
   subLabel.textContent=subText();
-  $('#liveInterpret').textContent = scan? 'Ruhig sitzen, gleichmäßig atmen. Danach volle HRV-Auswertung.' : 'Verbinde den Polar und folge dem Atem-Kreis.';
+  $('#liveInterpret').textContent = scan? 'Ruhemessung: einfach ganz normal atmen (NICHT wie beim Training steuern) — das ist deine Baseline.' : 'Training: langsam mit dem Kreis atmen (4–6) — das hebt die HRV aktiv.';
   if(!state.running){ resetOrb(); phaseLabel.textContent='Bereit'; }
 }
 
