@@ -245,6 +245,11 @@
   .wk-group[open]>summary::before{content:'▾';}
   .wk-sum{font-size:11px; color:var(--dim); font-weight:400; text-align:right;}
   .wk-body{padding-top:8px;}
+  #breathFocus{max-width:420px; margin:2px auto 6px; background:#14263e; border:1px solid var(--line); border-radius:12px; padding:10px 13px; flex:none;}
+  .bfocus-h{font-size:11px; color:var(--teal); text-transform:uppercase; letter-spacing:.5px; display:flex; justify-content:space-between; align-items:center;}
+  .bfocus-more{cursor:pointer; opacity:.55; font-size:14px;}
+  .bfocus-more:hover{opacity:1;}
+  .bfocus-t{font-size:13px; line-height:1.45; margin-top:4px; color:var(--txt); font-style:italic;}
   #resInterpret .ip{display:block; margin:7px 0; line-height:1.5;}
   #resInterpret .ip:first-child{font-size:15px;}
   /* Kennzahlen-Cockpit (Verlauf) */
@@ -309,6 +314,7 @@
   </div>
 
   <div class="sub" id="subLabel">4 Sek ein · 6 Sek aus — 6 Atemzüge/Min</div>
+  <div id="breathFocus" class="hide"></div>
 
   <div class="stats" id="statsRow">
     <div class="stat"><div class="v" id="statTime">5:00</div><div class="l">Restzeit</div></div>
@@ -1109,6 +1115,8 @@ function switchMode(m){
   $('#modeTitle').textContent=titles[m];
   $('#breathChooser').classList.toggle('hide',!isBreath);
   document.querySelectorAll('#breathChooser button').forEach(b=>b.classList.toggle('on',b.dataset.bmode===m));
+  const showFocus=isBreath && !(m==='hrv'&&state.hrvSub==='scan');
+  $('#breathFocus').classList.toggle('hide',!showFocus); if(showFocus) renderBreathFocus();
   const isHist=m==='history', isPlan=m==='plan', isToday=m==='heute', noBreath=isHist||isPlan||isToday;
   $('#orbWrap').classList.toggle('hide',noBreath);
   $('#phaseLabel').classList.toggle('hide',noBreath);
@@ -1145,6 +1153,7 @@ function applyHrvSub(){
   $('#cohWrap').classList.toggle('hide',scan);
   subLabel.textContent=subText();
   $('#liveInterpret').textContent = scan? 'Ruhemessung: einfach ganz normal atmen (NICHT wie beim Training steuern) — das ist deine Baseline.' : 'Training: langsam mit dem Kreis atmen (4–6) — das hebt die HRV aktiv.';
+  $('#breathFocus').classList.toggle('hide',scan); if(!scan) renderBreathFocus();
   if(!state.running){ resetOrb(); phaseLabel.textContent='Bereit'; }
 }
 
@@ -1413,13 +1422,19 @@ function interpretSession(r,isScan){
     p.push(`Miss idealerweise täglich zur gleichen Zeit (morgens, im Sitzen) für eine saubere Baseline. Qualität dieser Messung: <b>${r.quality}%</b>.`);
     return p.join(' ');
   }
-  let p=[];
-  if(r.success>=140) p.push(`Sehr starke Sitzung: <b>${r.success}% Übungserfolg</b> — deine Kohärenz lag zum größten Teil klar über deinem Ziel (${r.target}). Das Ziel darf steigen.`);
-  else if(r.success>=90) p.push(`Gute Sitzung: <b>${r.success}% Übungserfolg</b> — du hast dein Ziel (${r.target}) im Schnitt erreicht.`);
-  else p.push(`<b>${r.success}% Übungserfolg</b> — noch unter Ziel. Tipp: Atemrate feiner justieren (4,5–6,5/min) und Ausatmen betont lang.`);
-  const z=r.zones||{}; p.push(`${z.high||0}% der Zeit warst du in hoher, ${z.mid||0}% in mittlerer, ${z.low||0}% in niedriger Kohärenz.`);
-  if(r.rmssd) p.push(`Während der Übung: RMSSD ${r1(r.rmssd)} ms, RSA-getriebene LF-Power dominiert — genau das 0,1-Hz-Resonanzmuster, das den Vagus trainiert.`);
-  return p.join(' ');
+  const idx=Math.abs(Math.floor((r.ts||Date.now())/60000));
+  const prior=loadHist().filter(x=>x.mode==='hrv'&&x.success!=null&&x.ts<(r.ts||Infinity)).map(x=>x.success);
+  const s=r.success, P=[];
+  if(s>=140) P.push(pick([`Sehr starke Sitzung: <b>${s}% Übungserfolg</b> — deine Kohärenz lag klar über dem Ziel (${r.target}).`,`Top: <b>${s}%</b>. Du triffst deine Resonanz mühelos — wie schon bei myQiu bist du ein exzellenter Rhythmisierer.`],idx)+` <b>Dein Ziel darf steigen</b> (empfiehlt auch dein myQiu-Report).`);
+  else if(s>=90) P.push(pick([`Gute Sitzung: <b>${s}% Übungserfolg</b> — Ziel (${r.target}) im Schnitt erreicht.`,`Solide <b>${s}%</b>: sauber im Rhythmus geblieben, Ziel getroffen.`],idx));
+  else P.push(pick([`<b>${s}% Übungserfolg</b> — heute schwerer in den Rhythmus gefunden. Schwankt, kein Problem.`,`<b>${s}%</b> — noch unter Ziel.`],idx)+' '+pick(['Tipp: Ausatmen betont lang, ~5,5–6/min, Schultern locker.','Tipp: erst 3–4 ruhige Atemzüge, dann dem Kreis folgen — nicht erzwingen.'],idx));
+  const z=r.zones||{}; P.push(`Zeitverteilung: <b>${z.high||0}%</b> hohe · ${z.mid||0}% mittlere · ${z.low||0}% niedrige Kohärenz.`);
+  if(prior.length>=3){ const best=Math.max(...prior), avg=Math.round(prior.reduce((a,b)=>a+b,0)/prior.length), t=trendPct(prior.concat(s));
+    if(s>=best) P.push(`Das ist deine <b>beste Sitzung</b> bisher (über ${prior.length} Trainings).`);
+    else P.push(`Dein Schnitt liegt bei <b>${avg}%</b>${t!=null&&Math.abs(t)>=6?`, Trend ${t>0?'+':''}${t}%`:''}.`); }
+  if(r.rmssd) P.push(pick([`Während der Übung RMSSD ${r1(r.rmssd)} ms — die LF-Power dominiert, genau das 0,1-Hz-Resonanzmuster, das den Vagus trainiert.`,`RMSSD ${r1(r.rmssd)} ms in der Übung: Herz schwingt schön mit dem Atem (RSA) — Vagus-Training pur.`],idx));
+  P.push(pick(['Konstanz schlägt Länge — lieber täglich 5–10 Min als selten lang.','Punitos 4 Schritte vertiefen die Wirkung: Körper entspannen → Herz wahrnehmen → durchs Herz atmen → Bild dazu.','Für die Tiefendeutung: „An CC übergeben" und mit Claude besprechen.'],idx+1));
+  return P.map(x=>`<span class="ip">${x}</span>`).join('');
 }
 /* Ruhemessung: reiche, variierende, mitlernende Deutung (vergleicht mit deiner eigenen Historie) */
 function median(a){ if(!a.length) return null; const s=a.slice().sort((x,y)=>x-y), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
@@ -1906,6 +1921,28 @@ function renderMobility(){
 }
 $('#mobSave').addEventListener('click',()=>{ state.settings.mobilityText=$('#mobilityText').value; save(); $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); renderMobility(); toast('Übungen gespeichert.'); });
 $('#mobCancel').addEventListener('click',()=>{ $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); });
+/* Herzkohärenz-Fokus (aus Punitos ACT-Kurs: 4-Schritt-Aufbau + rotierende Visualisierung) */
+const VIS_FOCI = [
+ {t:'Innerer Kraftraum', x:'Führe mit jedem Atemzug dein Bewusstsein zu einem inneren Ort, an dem du sicher, entspannt und klar bist. (Woche 1)'},
+ {t:'Herzatmen', x:'Stell dir vor, dein Atem strömt direkt durch dein Herz ein und aus. Nichts tun - nur geschehen lassen.'},
+ {t:'Dankbarkeit', x:'Denk an etwas, für das du dankbar bist. Lass das warme Gefühl mit jedem Atemzug durchs Herz strömen.'},
+ {t:'Golden Light', x:'Atme goldenes Licht in dein Herz - bis in Scheitel und Fußsohlen. Beim Ausatmen die Dunkelheit ziehen lassen. (Osho)'},
+ {t:'Atishas Herz', x:'Einatmen: nährende, positive Energie ins Herz. Ausatmen: alles Schwere loslassen. Dein Herz wird kraftvoller und strahlt.'},
+ {t:'Verbundenheit', x:'Ruf ein Bild von jemandem, den du liebst, ins Herz. Atme dieses Gefühl von Nähe ein und aus.'},
+ {t:'Ruhe-Anker', x:'Ein Wort für heute: „ruhig". Beim Einatmen „ru", beim langen Ausatmen „hig".'},
+ {t:'Loslassen', x:'Mit jedem Ausatmen legst du etwas ab, das du heute nicht tragen musst. Die Schultern werden leichter.'},
+ {t:'Sicherer Ort', x:'Stell dir einen Ort in der Natur vor, wo du dich vollkommen wohlfühlst. Sei mit jedem Atemzug mehr dort.'},
+ {t:'Herzschlag spüren', x:'Spür deinen Herzschlag. Lass Atem und Herz sich zu einem gemeinsamen, ruhigen Rhythmus synchronisieren.'},
+ {t:'Emil im Herzen', x:'Nimm das Gefühl, das entsteht, wenn du an Emil denkst, ins Herz und atme es ein und aus.'},
+ {t:'Wohlwollen zum Körper', x:'Geh in Gedanken durch den Körper, von den Füßen zum Kopf. Erlaube jeder Stelle, etwas mehr loszulassen. (Schritt 1)'}
+];
+let focusIdx=null;
+function renderBreathFocus(){ const el=$('#breathFocus'); if(!el) return;
+  if(focusIdx==null) focusIdx=Math.floor(Date.now()/86400000)%VIS_FOCI.length;
+  const f=VIS_FOCI[focusIdx%VIS_FOCI.length];
+  el.innerHTML=`<div class="bfocus-h">🎯 Fokus für diese Übung<span class="bfocus-more" title="anderer Fokus">↻</span></div><div class="bfocus-t"><b>${esc(f.t)}</b> — ${esc(f.x)}</div>`;
+  const m=el.querySelector('.bfocus-more'); if(m) m.addEventListener('click',e=>{ e.stopPropagation(); focusIdx=(focusIdx+1)%VIS_FOCI.length; renderBreathFocus(); });
+}
 let spruchIdx=null;
 function renderSpruch(){ const el=$('#todaySpruch'); if(!el) return;
   if(spruchIdx==null) spruchIdx=Math.floor(Date.now()/86400000)%QUOTES.length;
