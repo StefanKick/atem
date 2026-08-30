@@ -235,6 +235,16 @@
   .spruch{background:linear-gradient(135deg,#1c2f4a,#17283d); border:1px solid #2c4a6e; border-radius:14px; padding:16px 18px 16px; font-size:16px; line-height:1.55; font-style:italic; color:#eaf1fc; position:relative;}
   .spruch-more{position:absolute; top:9px; right:12px; font-style:normal; color:var(--teal); cursor:pointer; font-size:15px; opacity:.55;}
   .spruch-more:hover{opacity:1;}
+  .breath-chooser{max-width:360px; margin:2px auto 8px; flex:none;}
+  .sport-goal{font-size:11px; padding:2px 9px; border-radius:11px; white-space:nowrap;}
+  .sport-goal.g-good{background:#153021; color:#7fc79b;} .sport-goal.g-mid{background:#33291a; color:#e0b063;} .sport-goal.g-bad{background:#3a1c1c; color:#ef9a9a;}
+  .wk-group{margin-bottom:6px;}
+  .wk-group>summary{list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:9px 6px; font-weight:600; font-size:14px; border-bottom:1px solid #1b2b45;}
+  .wk-group>summary::-webkit-details-marker{display:none;}
+  .wk-group>summary::before{content:'▸'; color:var(--dim); margin-right:6px; font-size:11px;}
+  .wk-group[open]>summary::before{content:'▾';}
+  .wk-sum{font-size:11px; color:var(--dim); font-weight:400; text-align:right;}
+  .wk-body{padding-top:8px;}
   #resInterpret .ip{display:block; margin:7px 0; line-height:1.5;}
   #resInterpret .ip:first-child{font-size:15px;}
   /* Kennzahlen-Cockpit (Verlauf) */
@@ -278,11 +288,15 @@
 
 <div class="tabs">
   <div class="tab active" data-mode="heute">Heute</div>
-  <div class="tab" data-mode="resonance">Atem</div>
-  <div class="tab" data-mode="sigh">Seufzer</div>
-  <div class="tab" data-mode="hrv">HRV</div>
+  <div class="tab" data-mode="atem">Atemübung</div>
   <div class="tab" data-mode="plan">Plan</div>
   <div class="tab" data-mode="history">Verlauf</div>
+</div>
+
+<div class="seg breath-chooser hide" id="breathChooser">
+  <button data-bmode="resonance" class="on">🫁 Resonanz</button>
+  <button data-bmode="sigh">🌬️ Seufzer</button>
+  <button data-bmode="hrv">💓 HRV</button>
 </div>
 
 <main>
@@ -611,7 +625,7 @@ FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahns
      markers:[], target:'', retest:'', retestLabel:'', stop:'',
      note:'Kein persönlicher Marker — allgemein gut belegt, Stufe-6-Kernstack-Kandidat. Zielsymptom eintragen oder als Basis akzeptieren.'}
   ] };
-const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
+const state = { mode:'resonance', breathSub:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
 
 /* ---------- Motivations-Sprüche (für Stefan: der Beste sein, nicht alles zu ernst nehmen, runterkommen) ---------- */
 const QUOTES = [
@@ -1086,10 +1100,15 @@ function subText(){ const s=state.settings; if(state.mode==='resonance'){ const 
 function switchMode(m){
   if(resTest) stopResonanceTest();
   if(state.running){ stopEngine(); if(engine&&engine._meta&&engine._meta.isHrv) stopRec(); stopAmbient(true); relWake(); setRunning(false); }
+  if(m==='atem') m=state.breathSub||'resonance';
+  const isBreath=(m==='resonance'||m==='sigh'||m==='hrv');
+  if(isBreath) state.breathSub=m;
   state.mode=m;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===m));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.mode===m || (t.dataset.mode==='atem'&&isBreath)));
   const titles={heute:'Heute',resonance:'Resonanz-Atmung',sigh:'Physiological Sigh',hrv:'HRV Live-Biofeedback',history:'Verlauf & Fortschritt',plan:'Plan & Supplements'};
   $('#modeTitle').textContent=titles[m];
+  $('#breathChooser').classList.toggle('hide',!isBreath);
+  document.querySelectorAll('#breathChooser button').forEach(b=>b.classList.toggle('on',b.dataset.bmode===m));
   const isHist=m==='history', isPlan=m==='plan', isToday=m==='heute', noBreath=isHist||isPlan||isToday;
   $('#orbWrap').classList.toggle('hide',noBreath);
   $('#phaseLabel').classList.toggle('hide',noBreath);
@@ -1114,6 +1133,7 @@ function switchMode(m){
   if(isToday) renderToday();
 }
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchMode(t.dataset.mode)));
+document.querySelectorAll('#breathChooser button').forEach(b=>b.addEventListener('click',()=>switchMode(b.dataset.bmode)));
 function resetStatsLabels(){ document.querySelectorAll('#statsRow .l')[0].textContent='Restzeit'; document.querySelectorAll('#statsRow .l')[1].textContent='Atemzüge'; const s=state.settings; $('#statTime').textContent=s.resNoLimit?'0:00':fmt(s.resDurMin*60*1000); $('#statBreaths').textContent=0; }
 
 /* HRV sub-mode (Training / Ruhemessung) */
@@ -1503,9 +1523,9 @@ function renderHistory(){
   // list (Original-Index bewahren für Öffnen/Löschen)
   const list=$('#histList');
   if(!h.length){ list.innerHTML='<div class="empty">Noch keine Sitzungen.<br>Starte eine Übung — sie erscheint hier automatisch.</div>'; $('#glossaryBody').innerHTML=GLOSSARY; return; }
-  const rows=h.map((r,idx)=>({r,idx})).reverse().filter(o=>histFilter==='all'||o.r.mode===histFilter).slice(0,150);
+  const rows=h.map((r,idx)=>({r,idx})).reverse().filter(o=>histFilter==='all'||o.r.mode===histFilter).slice(0,250);
   if(!rows.length){ list.innerHTML='<div class="empty">Keine Einträge in diesem Filter.</div>'; $('#glossaryBody').innerHTML=GLOSSARY; return; }
-  list.innerHTML = rows.map(({r,idx})=>{ const m=MODE_META[r.mode]||{i:'•',n:r.mode}; let met='';
+  const rowHtml=({r,idx})=>{ const m=MODE_META[r.mode]||{i:'•',n:r.mode}; let met='';
     if(r.mode==='hrv') met=`<b>${r.success!=null?r.success+'%':'–'}</b> Erfolg${r.coh!=null?` · Koh ${r.coh}`:''}`;
     else if(r.mode==='scan') met=`<b>${r.rmssd!=null?Math.round(r.rmssd):'–'}</b> RMSSD${r.meanHR?` · ${Math.round(r.meanHR)}bpm`:''}`;
     else if(r.mode==='garmin') met=`<b>${Math.round(r.rmssd)}</b> ms Nacht${r.g7!=null?` · Ø7 ${r.g7}`:''}`;
@@ -1516,6 +1536,21 @@ function renderHistory(){
     else met=`<b>${r.breaths||0}</b> Atemzüge`;
     const clickable=(r.mode==='hrv'||r.mode==='scan'); const vd=entryVerdict(r);
     return `<div class="h-row v-${vd.c}" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${r.mode==='activity'?esc(actName(r.name)):m.n}${(r.mode==='garmin'||r.mode==='sleep')?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}${vd.label?` · <span class="hv-badge ${vd.c}">${esc(vd.label)}</span>`:''}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
+  };
+  // nach Kalenderwoche gruppieren, einklappbar (nur laufende Woche offen)
+  const wkOf=ts=>{ const d=new Date(ts); const day=(d.getDay()+6)%7; const mo=new Date(d); mo.setDate(d.getDate()-day); mo.setHours(0,0,0,0); return mo.getTime(); };
+  const groups=[], gmap={};
+  rows.forEach(o=>{ const k=wkOf(o.r.ts); if(!gmap[k]){ gmap[k]={k,items:[]}; groups.push(gmap[k]); } gmap[k].items.push(o); });
+  const curWk=wkOf(Date.now());
+  list.innerHTML = groups.map(g=>{
+    const mo=new Date(g.k), su=new Date(g.k+6*86400000);
+    const label=`${mo.getDate()}.${mo.getMonth()+1}. – ${su.getDate()}.${su.getMonth()+1}.`;
+    const gar=g.items.filter(o=>o.r.mode==='garmin'&&o.r.rmssd!=null);
+    const avgH=gar.length?Math.round(gar.reduce((s,o)=>s+o.r.rmssd,0)/gar.length):null;
+    const ex=g.items.filter(o=>ACTIVE_MODES.includes(o.r.mode)).length;
+    const sport=g.items.filter(o=>o.r.mode==='activity').length;
+    const summ=[]; if(ex) summ.push(`${ex} Übung${ex>1?'en':''}`); if(sport) summ.push(`${sport}× Sport`); if(avgH!=null) summ.push(`Ø HRV ${avgH}`); if(!summ.length) summ.push(`${g.items.length} Einträge`);
+    return `<details class="wk-group"${g.k===curWk?' open':''}><summary><span>${g.k===curWk?'Diese Woche':label}</span><span class="wk-sum">${summ.join(' · ')}</span></summary><div class="wk-body">${g.items.map(rowHtml).join('')}</div></details>`;
   }).join('');
   document.querySelectorAll('#histList .h-row[data-idx]').forEach(el=>el.addEventListener('click',()=>{ const r=loadHist()[+el.dataset.idx]; if(r) openResult(r); }));
   document.querySelectorAll('#histList .h-del').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const idx=+el.dataset.del, hh=loadHist(), r=hh[idx]; if(!r) return; const m=MODE_META[r.mode]||{n:r.mode}; if(confirm(`Diesen Eintrag löschen?\n${m.n} · ${fmtDate(r.ts)}`)){ hh.splice(idx,1); saveHist(hh); renderHistory(); toast('Eintrag gelöscht.'); } }));
@@ -1835,13 +1870,26 @@ function weeklyPlan(){
        {t:'2–3 Ruhetage',d:'aktive Erholung, Atemübung, früh schlafen'}];
   return {cnt, km, durMin, rec, sessions};
 }
+function weekSport(){ // Einheiten in der laufenden Kalenderwoche (Mo–So)
+  const now=new Date(), dow=(now.getDay()+6)%7; // Mo=0
+  const ws=new Date(now); ws.setHours(0,0,0,0); ws.setDate(now.getDate()-dow);
+  const done=loadHist().filter(x=>x.mode==='activity'&&x.ts>=ws.getTime()).length;
+  const goal=state.settings.sportGoal||3;
+  return {done, goal, dow, daysLeftInclToday:7-dow};
+}
 function renderTraining(){ const el=$('#todayTraining'); if(!el) return;
-  const p=weeklyPlan(), isSun=new Date().getDay()===0;
+  const p=weeklyPlan(); const w=weekSport();
   const recTxt={low:'🔴 Erholung nötig',normal:'🟢 normal',high:'🟢 frisch'}[p.rec];
-  el.innerHTML=`<h3><span>🚴 Trainingswoche</span><span style="font-size:12px;color:var(--dim)">${isSun?'Wochenplan':'diese Woche'}</span></h3>`
+  const gc = w.done>=w.goal?'good':(w.done>=1?'mid':'bad');
+  const rem=w.goal-w.done;
+  let nudge='';
+  if(w.done>=w.goal) nudge=`<div class="pnote" style="margin-top:8px;">✅ Wochenziel erreicht — stark! Alles darüber ist Bonus.</div>`;
+  else if(w.dow>=3) nudge=`<div class="pnote" style="margin-top:8px; color:#e0b063;">⏰ Noch <b>${rem}</b> Einheit(en) in ${w.daysLeftInclToday} Tag(en) fürs ${w.goal}×-Ziel — heute wäre ein guter Tag.</div>`;
+  else nudge=`<div class="pnote" style="margin-top:8px;">🎯 Ziel: ${w.goal}× Sport diese Woche. Noch ${rem} zu gehen.</div>`;
+  el.innerHTML=`<h3><span>🚴 Trainingswoche</span><span class="sport-goal g-${gc}">${w.done}/${w.goal} diese Woche</span></h3>`
     +`<div class="pitem-info">Letzte 7 Tage: <b>${p.cnt}</b> Einheit(en)${p.km?` · ${p.km} km`:''}${p.durMin?` · ${p.durMin} Min`:''} · Erholung: ${recTxt}</div>`
-    +`<div style="margin-top:8px;">`+p.sessions.map(s=>`<div class="pitem-info">• <b>${esc(s.t)}</b> <span style="color:var(--dim)">— ${esc(s.d)}</span></div>`).join('')+`</div>`
-    +`<div class="pnote" style="margin-top:8px;">👉 Empfehlung, kein Muss — passt sich an HRV & letzte Belastung an.</div>`;
+    + nudge
+    +`<details class="acc-sub" style="margin-top:8px;"><summary>Wochenplan-Vorschlag</summary><div style="margin-top:6px;">`+p.sessions.map(s=>`<div class="pitem-info">• <b>${esc(s.t)}</b> <span style="color:var(--dim)">— ${esc(s.d)}</span></div>`).join('')+`<div class="pnote" style="margin-top:6px;">👉 Empfehlung, kein Muss — passt sich an HRV & Belastung an.</div></div></details>`;
 }
 $('#nutriEditBtn').addEventListener('click',()=>{ $('#nutritionText').value=state.settings.nutritionText; $('#nutriEditor').classList.remove('hide'); $('#nutritionBlocks').classList.add('hide'); $('#nutriEditBtn').classList.add('hide'); });
 $('#nutriCancel').addEventListener('click',()=>{ $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); });
