@@ -110,7 +110,10 @@
   .trend-seg button{padding:6px 10px; border-radius:16px; background:#1d2c44; border:1px solid var(--line); color:var(--dim); font-size:11.5px; cursor:pointer;}
   .trend-seg button.on{background:var(--teal-dim); color:#fff; border-color:var(--teal);}
   .h-list{margin-top:6px;}
-  .h-row{display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:12px; margin-bottom:8px; cursor:pointer;}
+  .h-row{display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--line); border-left-width:4px; border-radius:12px; margin-bottom:8px; cursor:pointer;}
+  .h-row.v-good{border-left-color:#5bbf8a;} .h-row.v-mid{border-left-color:#e0b063;} .h-row.v-bad{border-left-color:#ef9a9a;} .h-row.v-neutral{border-left-color:#3a4d6a;}
+  .hv-badge{display:inline-block; font-size:10px; padding:1px 7px; border-radius:9px; white-space:nowrap;}
+  .hv-badge.good{background:#153021; color:#7fc79b;} .hv-badge.mid{background:#33291a; color:#e0b063;} .hv-badge.bad{background:#3a1c1c; color:#ef9a9a;} .hv-badge.neutral{background:#1b2b45; color:var(--dim);}
   .h-row:active{background:#182a45;}
   .h-row .ico{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:15px; background:#1d2c44; flex:none;}
   .h-row .main{flex:1; min-width:0;}
@@ -1350,6 +1353,28 @@ function trendbadge(p){ if(p==null) return ''; if(p>2) return `<span class="arro
 
 const TRENDS=[ {k:'rmssd',n:'HRV Nacht (Garmin)',src:'garmin'}, {k:'success',n:'Übungserfolg',src:'hrv',fmt:v=>v+'%'}, {k:'coh',n:'Kohärenz',src:'hrv'}, {k:'rmssd',n:'RMSSD (Ruhe)',src:'scan'}, {k:'sdnn',n:'SDNN (Ruhe)',src:'scan'}, {k:'rmssd',n:'RMSSD (Training)',src:'hrv',id:'rmssd_tr'}, {k:'lfhf',n:'LF/HF (Ruhe)',src:'scan'} ];
 let curTrend=0, histFilter='all';
+/* Polyvagal-Ampel pro Verlaufs-Eintrag (Punitos Modell: grün=reguliert/Smart Vagus, gelb=Sympathikus/Stress, rot=Shutdown) */
+function entryVerdict(r){
+  const G='good', Y='mid', R='bad', NEU='neutral';
+  if(r.mode==='garmin'){ const v=r.rmssd, lo=r.baseLo, hi=r.baseHi;
+    if(lo&&hi){ if(v>hi) return {c:G,label:'stark erholt'}; if(v>=lo) return {c:G,label:'reguliert · HRV in Baseline'}; if(v>=lo*0.85) return {c:Y,label:'angespannt · unter Baseline'}; return {c:R,label:'unter-erholt · HRV niedrig'}; }
+    return {c:NEU,label:'Nacht-HRV'}; }
+  if(r.mode==='sleep'){ const s=r.score; if(s==null) return {c:NEU,label:'Schlaf'};
+    if(s>=75) return {c:G,label:'guter Schlaf'}; if(s>=60) return {c:Y,label:'mäßiger Schlaf'}; return {c:R,label:'wenig erholsam'}; }
+  if(r.mode==='scan'){ const v=r.rmssd; if(v==null) return {c:NEU,label:'Ruhemessung'};
+    if(v>=55) return {c:G,label:'starke Vagusaktivität'}; if(v>=38) return {c:G,label:'gute Vagusaktivität'}; if(v>=26) return {c:Y,label:'Vagus gedämpft'}; return {c:R,label:'niedrige HRV'}; }
+  if(r.mode==='hrv'){ const s=r.success; if(s==null) return {c:NEU,label:'HRV-Training'};
+    if(s>=120) return {c:G,label:'starke Kohärenz'}; if(s>=90) return {c:G,label:'Ziel erreicht'}; if(s>=60) return {c:Y,label:'unter Ziel'}; return {c:R,label:'wenig Kohärenz'}; }
+  if(r.mode==='activity') return {c:G,label:'Sport ✓'};
+  if(r.mode==='resonance') return {c:G,label:'Atemübung ✓'};
+  if(r.mode==='sigh') return {c:G,label:'Seufzer ✓'};
+  if(r.mode==='log'){ let good=0,bad=0;
+    if(r.sleepScore){ if(r.sleepScore>=4) good++; else if(r.sleepScore<=2) bad++; }
+    if(r.mood){ if(r.mood>=4) good++; else if(r.mood<=2) bad++; }
+    if(r.dip!=null&&r.dip>=2) bad++; if(r.bruxism) bad++;
+    if(bad>good) return {c:R,label:'belasteter Tag'}; if(good>bad) return {c:G,label:'guter Tag'}; return {c:Y,label:'Check-in'}; }
+  return {c:NEU,label:''};
+}
 function renderHistory(){
   const h=loadHist();
   const active=h.filter(r=>ACTIVE_MODES.includes(r.mode));
@@ -1383,8 +1408,8 @@ function renderHistory(){
     else if(r.mode==='sleep') met=`<b>${r.score!=null?r.score:'–'}</b> Score${r.hours?` · ${r.hours}h`:''}`;
     else if(r.mode==='activity') met=r.distance>0?`<b>${(r.distance/1000).toFixed(1)}</b> km`:'Aktivität';
     else met=`<b>${r.breaths||0}</b> Atemzüge`;
-    const clickable=(r.mode==='hrv'||r.mode==='scan');
-    return `<div class="h-row" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${r.mode==='activity'?esc(actName(r.name)):m.n}${(r.mode==='garmin'||r.mode==='sleep')?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
+    const clickable=(r.mode==='hrv'||r.mode==='scan'); const vd=entryVerdict(r);
+    return `<div class="h-row v-${vd.c}" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${r.mode==='activity'?esc(actName(r.name)):m.n}${(r.mode==='garmin'||r.mode==='sleep')?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}${vd.label?` · <span class="hv-badge ${vd.c}">${esc(vd.label)}</span>`:''}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
   }).join('');
   document.querySelectorAll('#histList .h-row[data-idx]').forEach(el=>el.addEventListener('click',()=>{ const r=loadHist()[+el.dataset.idx]; if(r) openResult(r); }));
   document.querySelectorAll('#histList .h-del').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const idx=+el.dataset.del, hh=loadHist(), r=hh[idx]; if(!r) return; const m=MODE_META[r.mode]||{n:r.mode}; if(confirm(`Diesen Eintrag löschen?\n${m.n} · ${fmtDate(r.ts)}`)){ hh.splice(idx,1); saveHist(hh); renderHistory(); toast('Eintrag gelöscht.'); } }));
