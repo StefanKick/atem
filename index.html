@@ -231,6 +231,10 @@
   .ins-t{font-size:14px; font-weight:600;}
   .ins-d{font-size:12px; color:var(--dim); margin-top:1px;}
   .ins-warn .ins-t{color:#e0b063;}
+  #todaySpruch{margin-bottom:14px;}
+  .spruch{background:linear-gradient(135deg,#1c2f4a,#17283d); border:1px solid #2c4a6e; border-radius:14px; padding:16px 18px 16px; font-size:16px; line-height:1.55; font-style:italic; color:#eaf1fc; position:relative;}
+  .spruch-more{position:absolute; top:9px; right:12px; font-style:normal; color:var(--teal); cursor:pointer; font-size:15px; opacity:.55;}
+  .spruch-more:hover{opacity:1;}
   #resInterpret .ip{display:block; margin:7px 0; line-height:1.5;}
   #resInterpret .ip:first-child{font-size:15px;}
   /* Kennzahlen-Cockpit (Verlauf) */
@@ -342,12 +346,10 @@
   <!-- Heute Dashboard -->
   <div id="todayView" class="hide">
     <div id="todayGreet" style="font-size:15px; margin:2px 0 14px; text-align:center; color:var(--dim);"></div>
+    <div id="todaySpruch"></div>
     <div id="todayReadiness"></div>
     <div class="pblock hide" id="todayInsights"></div>
     <div class="pblock" id="todaySupp"></div>
-    <div class="pblock hide" id="todayAudit"></div>
-    <div class="pblock" id="todayAtem"></div>
-    <div class="pblock" id="todayHrv"></div>
     <div class="pblock" id="todayTraining"></div>
     <div class="pblock" id="todayMobility"></div>
     <div id="mobilityEditor" class="hide" style="margin-bottom:14px;">
@@ -610,6 +612,110 @@ FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahns
      note:'Kein persönlicher Marker — allgemein gut belegt, Stufe-6-Kernstack-Kandidat. Zielsymptom eintragen oder als Basis akzeptieren.'}
   ] };
 const state = { mode:'resonance', hrvSub:'train', running:false, settings:{...DEF} };
+
+/* ---------- Motivations-Sprüche (für Stefan: der Beste sein, nicht alles zu ernst nehmen, runterkommen) ---------- */
+const QUOTES = [
+ "Du machst das außergewöhnlich gut - auch wenn du es dir selten selbst sagst.",
+ "Nimm heute nichts zu ernst. Das meiste löst sich von allein.",
+ "Du bist genau da, wo du hingehörst - und du bist verdammt gut darin.",
+ "Atme. Der Moment trägt dich, du musst ihn nicht festhalten.",
+ "Nicht jede Aufgabe verdient deine Anspannung. Wähle bewusst.",
+ "Du gehörst zu den Besten in dem, was du tust. Das ist keine Einbildung.",
+ "Locker durch - deine beste Arbeit entsteht nie unter Druck.",
+ "Dein Wert hängt nicht an deiner To-do-Liste.",
+ "Fehler sind Daten, kein Urteil über dich.",
+ "Du darfst heute stolz auf dich sein. Ohne Bedingung.",
+ "Ruhig bleiben ist keine Schwäche - es ist deine Superkraft.",
+ "Was jetzt riesig wirkt, ist in einem Jahr eine Anekdote.",
+ "Du hast schon so viel gemeistert. Auch das hier schaffst du.",
+ "Weniger greifen, mehr geschehen lassen.",
+ "Dein Körper darf sich entspannen - gerade ist alles sicher.",
+ "Du bist nicht deine Gedanken. Du bist der, der sie bemerkt.",
+ "Perfektion ist ein Gerücht. Gut genug ist meistens brillant.",
+ "Emil sieht einen Papa, der genug ist - genau so, wie du bist.",
+ "Ein tiefer Atemzug ist immer verfügbar. Nimm ihn jetzt.",
+ "Du musst nicht alles kontrollieren, damit es gut wird.",
+ "Schultern runter, Kiefer locker. Du hast das im Griff.",
+ "Die Welt dreht sich weiter, auch wenn du mal pausierst.",
+ "Dein Kopf darf jetzt leiser werden. Er hat genug gearbeitet.",
+ "Du bist kein Sprinter im Dauerlauf - teile dir die Kraft ein.",
+ "Vertrau deinem Können. Es hat dich bis hierher getragen.",
+ "Heute reicht ein guter Schritt. Nicht der ganze Weg.",
+ "Anspannung ist ein Angebot, kein Befehl. Du darfst ablehnen.",
+ "Du wirkst souveräner nach außen, als du dich innen fühlst - glaub den anderen ruhig mal.",
+ "Große Dinge entstehen aus ruhiger Hand, nicht aus Hektik.",
+ "Sei zu dir so freundlich wie zu deinem besten Freund.",
+ "Du darfst Dinge auch mal leicht nehmen. Gerade die schweren.",
+ "Dein Nervensystem darf lernen: Es ist okay, loszulassen.",
+ "Nicht alles, was dringend erscheint, ist wichtig.",
+ "Du bist genug. Nicht wenn du fertig bist - jetzt schon.",
+ "Der beste Deal des Tages: einmal tief durchatmen.",
+ "Lächle. Dein Gehirn glaubt dir und schaltet einen Gang runter.",
+ "Du triffst gute Entscheidungen. Auch heute wirst du das.",
+ "Lass die Welt kurz warten. Sie tut es sowieso.",
+ "Was du aufgebaut hast, ist beeindruckend. Erinnere dich daran.",
+ "Ruhe ist produktiv. Sie ist der Boden, auf dem alles wächst.",
+ "Du musst niemandem etwas beweisen. Am wenigsten dir.",
+ "Ein ruhiger Puls schlägt tausend gute Vorsätze.",
+ "Du darfst auch mal Fünfe gerade sein lassen.",
+ "Dein Wert steigt nicht durch mehr Sorgen. Nur dein Blutdruck.",
+ "Heute ist ein guter Tag, um sanft mit dir zu sein.",
+ "Du bist der Ruhepol, den andere in dir suchen. Sei ihn zuerst für dich.",
+ "Loslassen ist auch eine Form von Stärke.",
+ "Das Leben ist zu kurz, um es die ganze Zeit ernst zu nehmen.",
+ "Du hast heute schon mehr richtig gemacht, als dir bewusst ist.",
+ "Vertrauen schlägt Kontrolle. Fast immer.",
+ "Dein Atem ist die Fernbedienung für deine Ruhe. Benutz sie.",
+ "Sei stolz, nicht perfekt.",
+ "Du darfst Erfolg haben, ohne dich dabei zu verkrampfen.",
+ "Der Druck kommt von innen - und da kannst du ihn auch wieder rauslassen.",
+ "Gut gemacht. Wirklich. Nimm das mal an.",
+ "Wenn du ruhiger wirst, wird alles um dich herum leichter.",
+ "Deine Familie braucht dich entspannt, nicht erschöpft.",
+ "Manchmal ist Nichtstun die klügste Handlung.",
+ "Du bist ein Könner. Handle heute aus dieser Gewissheit.",
+ "Sorgen sind Zinsen, die du auf Probleme zahlst, die nie kommen.",
+ "Weich werden ist erlaubt. Gerade wenn es hart ist.",
+ "Du strahlst mehr Sicherheit aus, als du denkst.",
+ "Ein Tag ohne Perfektion ist trotzdem ein guter Tag.",
+ "Dein Körper ist auf deiner Seite. Hör ihm zu.",
+ "Heute darfst du auch mal genießen, was schon da ist.",
+ "Nicht schneller. Ruhiger. Das ist dein Upgrade.",
+ "Du bist nicht spät dran. Du bist genau im Fluss.",
+ "Dankbarkeit ist der kürzeste Weg zurück in die Ruhe.",
+ "Du hast nichts zu beweisen und alles zu genießen.",
+ "Deine besten Ideen kommen, wenn du aufhörst zu pressen.",
+ "Sei der ruhige Kapitän, nicht der nervöse Passagier.",
+ "Was auch kommt: Du wirst es lösen. Wie immer.",
+ "Ein bisschen Gelassenheit steht dir richtig gut.",
+ "Du bist mehr als deine Leistung. Viel mehr.",
+ "Atme ein - du bekommst genug. Atme aus - du gibst genug.",
+ "Heute: einmal weniger Sorge, einmal mehr Vertrauen.",
+ "Du darfst dir selbst der beste Chef sein - ein fairer.",
+ "Ruhe ausstrahlen beginnt mit einem langen Ausatmen.",
+ "Du bist gut. Punkt. Kein Sternchen, keine Bedingung.",
+ "Die Anspannung will dich schützen. Sag ihr freundlich: nicht nötig.",
+ "Kleine Pausen sind keine Zeitverschwendung. Sie sind Investition.",
+ "Du musst den Berg nicht heute versetzen. Ein Stein reicht.",
+ "Sei nachsichtig mit dir. Du gibst schon dein Bestes.",
+ "Dein Lächeln entspannt nicht nur dich, sondern alle um dich.",
+ "Weniger Kopf, mehr Herz - und der Rest wird leichter.",
+ "Du bist verlässlich, fähig und wach. Das reicht völlig.",
+ "Gib dem Moment eine Chance, gut zu sein.",
+ "Runterkommen ist kein Rückschritt. Es ist Regeneration.",
+ "Du hast dir Leichtigkeit verdient. Nimm sie dir.",
+ "Der Tag gehört dir - nicht deiner Anspannung.",
+ "Selbst an unruhigen Tagen bist du im Kern stabil.",
+ "Nimm es sportlich: nicht jeder Ball muss zurück.",
+ "Du bist genau der Richtige für deine Aufgaben.",
+ "Vertrau dem Prozess. Und atme dabei.",
+ "Heute ein Prozent gelassener als gestern. Das genügt.",
+ "Du bist okay. Alles ist okay. Und das darf sich auch so anfühlen.",
+ "Halt kurz inne, richte dich auf, atme durch. So. Weiter geht es.",
+ "Am Ende zählt nicht, wie angespannt du warst - sondern wie präsent.",
+ "Du bist der Beste, den du für diesen Job kennst. Handle danach."
+];
+function todaySpruch(){ return QUOTES[Math.floor(Date.now()/86400000)%QUOTES.length]; }
 
 /* ---------- Laborwerte-Modell (Referenzen aus Profil 04/2026) ---------- */
 const LAB_MARKERS = [
@@ -1752,6 +1858,12 @@ function renderMobility(){
 }
 $('#mobSave').addEventListener('click',()=>{ state.settings.mobilityText=$('#mobilityText').value; save(); $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); renderMobility(); toast('Übungen gespeichert.'); });
 $('#mobCancel').addEventListener('click',()=>{ $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); });
+let spruchIdx=null;
+function renderSpruch(){ const el=$('#todaySpruch'); if(!el) return;
+  if(spruchIdx==null) spruchIdx=Math.floor(Date.now()/86400000)%QUOTES.length;
+  el.innerHTML=`<div class="spruch">„${esc(QUOTES[spruchIdx])}"<span class="spruch-more" title="nächster Spruch">↻</span></div>`;
+  const m=el.querySelector('.spruch-more'); if(m) m.addEventListener('click',()=>{ spruchIdx=(spruchIdx+1)%QUOTES.length; renderSpruch(); });
+}
 function renderToday(){
   const d=new Date(), h=d.getHours(), greet=h<11?'Guten Morgen':(h<18?'Guten Tag':'Guten Abend');
   $('#todayGreet').innerHTML=`<b style="color:var(--txt)">${greet}.</b> ${d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})}`;
@@ -1764,26 +1876,8 @@ function renderToday(){
       + cb.items.map(it=>`<div class="pitem-info">• ${esc(it.name)}${it.dose?` <span style="color:var(--dim)">· ${esc(it.dose)}</span>`:''}</div>`).join('')
       + (cb.note?`<div class="pnote">👉 ${esc(cb.note)}</div>`:'')
       + `<div style="margin-top:10px;"><a id="toPlan" style="color:var(--teal); cursor:pointer; font-size:13px;">Kompletter Plan →</a></div>` : '<div class="pitem-info" style="color:var(--dim)">Kein Plan hinterlegt.</div>';
-  const dk=dayKey(Date.now()), todays=loadHist().filter(x=>ACTIVE_MODES.includes(x.mode)&&dayKey(x.ts)===dk), mins=Math.round(todays.reduce((s,x)=>s+(x.dur||0),0)/60);
-  const g=loadHist().filter(x=>x.mode==='garmin'&&x.rmssd!=null), sc=loadHist().filter(x=>x.mode==='scan'&&x.rmssd!=null); let hrvLine='noch keine HRV-Daten';
-  if(g.length){ const lg=g[g.length-1]; hrvLine=`Nacht-HRV ${Math.round(lg.rmssd)} ms${lg.g7!=null?` · Ø7 ${lg.g7}`:''} <span style="color:var(--dim)">(${fmtDate(lg.ts)})</span>`; }
-  else if(sc.length){ const ls=sc[sc.length-1]; hrvLine=`Ruhe-RMSSD ${Math.round(ls.rmssd)} ms <span style="color:var(--dim)">(${fmtDate(ls.ts)})</span>`; }
-  $('#todayAtem').innerHTML=`<h3><span>🫁 Atem & HRV</span></h3>`
-    +`<div class="pitem-info">Atem heute: ${todays.length?`✓ ${todays.length} Übung(en) · ${mins} Min`:'noch keine'}</div>`
-    +`<div class="pitem-info">HRV: ${hrvLine}</div>`
-    +`<div style="margin-top:10px;"><button class="btn sm" id="toAtem" style="max-width:240px;">Resonanz-Atmung starten</button></div>`;
-  $('#todayHrv').innerHTML=''; $('#todayHrv').style.display='none';
   const tp=$('#toPlan'); if(tp) tp.addEventListener('click',()=>switchMode('plan'));
-  const ta=$('#toAtem'); if(ta) ta.addEventListener('click',()=>switchMode('resonance'));
-  const ael=$('#todayAudit');
-  if(ael){ const ast=(state.settings.audit||[]).map(auditStatus), over=ast.filter(x=>x.overdue).length, strike=ast.filter(x=>x.level==='strike').length;
-    if(over||strike){ ael.classList.remove('hide');
-      ael.innerHTML=`<h3><span>🔍 Supplement-Check</span></h3><div class="pitem-info">`
-        +`${over?`<b style="color:#ef9a9a">${over} Kontrolle(n) überfällig</b>${strike?' · ':''}`:''}${strike?`${strike} Streich-Kandidat(en)`:''}`
-        +` <a id="toPlanAudit" style="color:var(--teal); cursor:pointer;">im Plan prüfen →</a></div>`;
-      const la=$('#toPlanAudit'); if(la) la.addEventListener('click',()=>switchMode('plan'));
-    } else { ael.classList.add('hide'); ael.innerHTML=''; } }
-  renderInsights(); renderTraining(); renderMobility(); renderCheckin();
+  renderSpruch(); renderInsights(); renderTraining(); renderMobility(); renderCheckin();
 }
 /* ---------- Tages-Check-in (Kontext-Log) ---------- */
 function todayLog(){ const dk=dayKey(Date.now()); return loadHist().find(r=>r.mode==='log'&&dayKey(r.ts)===dk)||null; }
