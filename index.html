@@ -1103,7 +1103,7 @@ startBtn.addEventListener('click',()=>{
 
 /* ---------- Modes / tabs ---------- */
 function subText(){ const s=state.settings; if(state.mode==='resonance'){ const bpm=(60/(s.in+s.h1+s.out+s.h2)).toFixed(1); return `${s.in} Sek ein · ${s.out} Sek aus — ${bpm} Atemzüge/Min`; } if(state.mode==='sigh') return 'Doppel-Einatmung, langer Ausatem — 3–4× bei Seitenstechen'; if(state.mode==='hrv') return state.hrvSub==='scan'?'Ruhig sitzen — misst deine Baseline-HRV':'Start drücken, mit dem Kreis atmen'; return ''; }
-function switchMode(m){
+function switchMode(m, push=true){
   if(resTest) stopResonanceTest();
   if(state.running){ stopEngine(); if(engine&&engine._meta&&engine._meta.isHrv) stopRec(); stopAmbient(true); relWake(); setRunning(false); }
   if(m==='atem') m=state.breathSub||'resonance';
@@ -1139,9 +1139,18 @@ function switchMode(m){
   if(isHist) renderHistory();
   if(isPlan) renderPlan();
   if(isToday) renderToday();
+  if(!window._histInit){ try{ history.replaceState({v:m},''); }catch(e){} window._histInit=true; }
+  else if(push){ try{ history.pushState({v:m},''); }catch(e){} }
 }
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchMode(t.dataset.mode)));
 document.querySelectorAll('#breathChooser button').forEach(b=>b.addEventListener('click',()=>switchMode(b.dataset.bmode)));
+/* Android/PWA Zurück-Button: innerhalb der App navigieren statt schließen */
+window.addEventListener('popstate', function(e){
+  if($('#result') && $('#result').classList.contains('open')){ $('#result').classList.remove('open'); if(state.mode==='history') renderHistory(); try{ history.pushState({v:state.mode},''); }catch(_){}; return; }
+  if(typeof sheet!=='undefined' && sheet && sheet.classList.contains('open')){ closeSheet(); try{ history.pushState({v:state.mode},''); }catch(_){}; return; }
+  const v=(e.state&&e.state.v)||'heute';
+  switchMode(v, false);
+});
 function resetStatsLabels(){ document.querySelectorAll('#statsRow .l')[0].textContent='Restzeit'; document.querySelectorAll('#statsRow .l')[1].textContent='Atemzüge'; const s=state.settings; $('#statTime').textContent=s.resNoLimit?'0:00':fmt(s.resDurMin*60*1000); $('#statBreaths').textContent=0; }
 
 /* HRV sub-mode (Training / Ruhemessung) */
@@ -1159,7 +1168,7 @@ function applyHrvSub(){
 
 /* ---------- Settings sheet ---------- */
 const sheet=$('#sheet'), sheetBg=$('#sheetBg');
-$('#gearBtn').addEventListener('click',()=>{ sheet.classList.add('open'); sheetBg.classList.add('open'); });
+$('#gearBtn').addEventListener('click',()=>{ sheet.classList.add('open'); sheetBg.classList.add('open'); try{ history.pushState({v:state.mode},''); }catch(e){} });
 function closeSheet(){ sheet.classList.remove('open'); sheetBg.classList.remove('open'); if(!state.running){ clearTimeout(bgPrevTimer); stopAmbient(true); } save(); }
 $('#closeSheet').addEventListener('click',closeSheet); sheetBg.addEventListener('click',closeSheet);
 function bindRange(id,key,out,after){ const r=$(id); r.addEventListener('input',()=>{ state.settings[key]=parseFloat(r.value); $(out).textContent=r.value; after&&after(); }); }
@@ -1338,6 +1347,7 @@ function openResult(r){
     ? 'Normwerte: Ruhe, spontane Atmung (Nunan 2010). Einzelmessung ist tagesformabhängig — der Wochen-Trend zählt.'
     : 'Achtung: Bei ~6/min-Atmung sind SDNN, LF &amp; Total Power trainingsbedingt stark erhöht (0,1-Hz-Resonanz) — das ist der gewünschte Effekt, nicht mit Ruhe-Normwerten vergleichbar. Für Baseline die Ruhemessung nutzen.';
   $('#result').classList.add('open');
+  try{ history.pushState({v:state.mode},''); }catch(e){}
 }
 function card(v,l){ return `<div class="res-card"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
 $('#resClose').addEventListener('click',()=>{ $('#result').classList.remove('open'); if(state.mode==='history') renderHistory(); });
@@ -1487,6 +1497,8 @@ const ACTIVE_MODES=['resonance','sigh','hrv','scan']; // aktive Übungen (Garmin
 const ACTIVITY_NAMES={cycling:'Radfahren',road_biking:'Rennrad',mountain_biking:'Mountainbike',gravel_cycling:'Gravel',indoor_cycling:'Indoor-Rad',virtual_ride:'Indoor-Rad',running:'Laufen',treadmill_running:'Laufband',trail_running:'Trailrunning',walking:'Gehen',casual_walking:'Spazieren',hiking:'Wandern',tennis:'Tennis',padel:'Padel',swimming:'Schwimmen',lap_swimming:'Bahnenschwimmen',open_water_swimming:'Freiwasser',strength_training:'Krafttraining',pilates:'Pilates',yoga:'Yoga',cardio:'Cardio',hiit:'HIIT',elliptical:'Crosstrainer',rowing:'Rudern',indoor_rowing:'Indoor-Rudern',fitness_equipment:'Fitnessgerät',stand_up_paddleboarding:'SUP',skiing:'Ski',snowboarding:'Snowboard'};
 function actName(k){ if(!k) return 'Aktivität'; const c=String(k).replace(/_v\d+$/,''); return ACTIVITY_NAMES[c]||ACTIVITY_NAMES[k]||c.replace(/_/g,' ').replace(/\b\w/g,ch=>ch.toUpperCase()); }
 function fmtDate(ts){ const d=new Date(ts), now=new Date(); const sd=d.toDateString()===now.toDateString(); const yd=new Date(now); yd.setDate(now.getDate()-1); const iy=d.toDateString()===yd.toDateString(); const tm=d.toTimeString().slice(0,5); if(sd) return 'Heute '+tm; if(iy) return 'Gestern '+tm; return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+tm; }
+function fmtDay2(ts){ const d=new Date(ts), now=new Date(); const sd=d.toDateString()===now.toDateString(); const yd=new Date(now); yd.setDate(now.getDate()-1); const iy=d.toDateString()===yd.toDateString(); if(sd) return 'Heute'; if(iy) return 'Gestern'; return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}); }
+function fmtHours(h){ if(h==null) return ''; const q=Math.round(h*4)/4; return q.toString().replace('.',','); }
 function dayKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); }
 function computeStreak(h){ if(!h.length) return 0; const days=new Set(h.map(r=>dayKey(r.ts))); let s=0; const d=new Date(); if(!days.has(dayKey(d.getTime()))){ d.setDate(d.getDate()-1); if(!days.has(dayKey(d.getTime()))) return 0; } while(days.has(dayKey(d.getTime()))){ s++; d.setDate(d.getDate()-1); } return s; }
 function trendPct(vals){ if(vals.length<4) return null; const mid=Math.floor(vals.length/2), o=vals.slice(0,mid), n=vals.slice(mid); const a=o.reduce((x,y)=>x+y,0)/o.length, b=n.reduce((x,y)=>x+y,0)/n.length; if(!a) return null; return Math.round((b-a)/a*100); }
@@ -1546,11 +1558,11 @@ function renderHistory(){
     else if(r.mode==='garmin') met=`<b>${Math.round(r.rmssd)}</b> ms Nacht${r.g7!=null?` · Ø7 ${r.g7}`:''}`;
     else if(r.mode==='sigh') met=`<b>${r.cycles}</b> Seufzer`;
     else if(r.mode==='log'){ const p=[]; if(r.sleepScore) p.push(`Schlaf ${r.sleepScore}`); if(r.stools!=null) p.push(`Stühle ${r.stools}`); if(r.bristol) p.push(`Bristol ${r.bristol}`); if(r.urgency!=null) p.push(`Drang ${r.urgency}`); met=`${r.flagCC?'🧠 ':''}${p.join(' · ')||'Check-in'}`; }
-    else if(r.mode==='sleep') met=`<b>${r.score!=null?r.score:'–'}</b> Score${r.hours?` · ${r.hours}h`:''}`;
+    else if(r.mode==='sleep') met=`<b>${r.score!=null?r.score:'–'}</b> Score${r.hours?` · ${fmtHours(r.hours)} h`:''}`;
     else if(r.mode==='activity') met=r.distance>0?`<b>${(r.distance/1000).toFixed(1)}</b> km`:'Aktivität';
     else met=`<b>${r.breaths||0}</b> Atemzüge`;
     const clickable=(r.mode==='hrv'||r.mode==='scan'); const vd=entryVerdict(r);
-    return `<div class="h-row v-${vd.c}" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${r.mode==='activity'?esc(actName(r.name)):m.n}${(r.mode==='garmin'||r.mode==='sleep')?'':' · '+fmtM(r.dur)}</div><div class="s">${fmtDate(r.ts)}${vd.label?` · <span class="hv-badge ${vd.c}">${esc(vd.label)}</span>`:''}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
+    return `<div class="h-row v-${vd.c}" ${clickable?`data-idx="${idx}"`:''} style="${clickable?'':'cursor:default'}"><div class="ico">${m.i}</div><div class="main"><div class="d">${r.mode==='activity'?esc(actName(r.name)):m.n}${(r.mode==='garmin'||r.mode==='sleep')?'':' · '+fmtM(r.dur)}</div><div class="s">${(r.mode==='garmin'||r.mode==='sleep')?fmtDay2(r.ts):fmtDate(r.ts)}${vd.label?` · <span class="hv-badge ${vd.c}">${esc(vd.label)}</span>`:''}</div></div><div class="met">${met}</div><div class="h-del" data-del="${idx}" title="Eintrag löschen">✕</div></div>`;
   };
   // nach Kalenderwoche gruppieren, einklappbar (nur laufende Woche offen)
   const wkOf=ts=>{ const d=new Date(ts); const day=(d.getDay()+6)%7; const mo=new Date(d); mo.setDate(d.getDate()-day); mo.setHours(0,0,0,0); return mo.getTime(); };
@@ -1644,7 +1656,7 @@ function buildKpiCockpit(h){
     if(st==='warn'||(t&&t.cls==='dn')) focus.push('Nächtliche HRV niedrig oder fallend — Schlaf, Alkohol und die Trainingslast der Vortage sind die Stellschrauben; morgens/abends 5 Min Resonanzatmung.'); }
   if(slp.length){ const last=slp[slp.length-1], a7=slp.slice(-7).map(x=>x.score), m=a7.reduce((x,y)=>x+y,0)/a7.length, t=kpiTr(slp.slice(-10).map(x=>x.score));
     const st=m>=75?'good':(m>=60?'ok':'warn');
-    rows.push({n:'Schlaf-Score',s:'Garmin · 7-Tage-Ø',v:r1(m),u:'',t,st,vd:`zuletzt ${r1(last.score)}${last.hours?` · ${last.hours} h`:''}`});
+    rows.push({n:'Schlaf-Score',s:'Garmin · 7-Tage-Ø',v:r1(m),u:'',t,st,vd:`zuletzt ${r1(last.score)}${last.hours?` · ${fmtHours(last.hours)} h`:''}`});
     if(st==='warn') focus.push('Schlaf-Score im unteren Bereich — dein größter HRV-Hebel. Feste Schlafzeiten, abends leichter und früher essen, Screen-Zeit runter.'); }
   if(rhr.length){ const last=rhr[rhr.length-1], t=kpiTr(rhr.slice(-10).map(x=>x.rhr), true);
     rows.push({n:'Ruhepuls',s:'Garmin',v:r1(last.rhr),u:'bpm',t,st:'ok',vd:'niedriger = erholter'}); }
