@@ -245,11 +245,13 @@
   .wk-group[open]>summary::before{content:'▾';}
   .wk-sum{font-size:11px; color:var(--dim); font-weight:400; text-align:right;}
   .wk-body{padding-top:8px;}
-  #breathFocus{max-width:420px; margin:2px auto 6px; background:#14263e; border:1px solid var(--line); border-radius:12px; padding:10px 13px; flex:none;}
-  .bfocus-h{font-size:11px; color:var(--teal); text-transform:uppercase; letter-spacing:.5px; display:flex; justify-content:space-between; align-items:center;}
-  .bfocus-more{cursor:pointer; opacity:.55; font-size:14px;}
-  .bfocus-more:hover{opacity:1;}
-  .bfocus-t{font-size:13px; line-height:1.45; margin-top:4px; color:var(--txt); font-style:italic;}
+  #breathFocus{max-width:420px; margin:2px auto 6px; flex:none;}
+  .bfocus-det>summary{list-style:none; cursor:pointer; background:#14263e; border:1px solid var(--line); border-radius:10px; padding:6px 12px; font-size:12px; color:var(--teal); text-align:center;}
+  .bfocus-det>summary::-webkit-details-marker{display:none;}
+  .bfocus-det>summary::after{content:' ▾'; opacity:.5;}
+  .bfocus-det[open]>summary::after{content:' ▴';}
+  .bfocus-t{font-size:13px; line-height:1.45; margin-top:6px; color:var(--txt); font-style:italic; text-align:center;}
+  .bfocus-more{margin-left:8px; color:var(--teal); cursor:pointer; font-style:normal; font-size:12px; white-space:nowrap;}
   #resInterpret .ip{display:block; margin:7px 0; line-height:1.5;}
   #resInterpret .ip:first-child{font-size:15px;}
   /* Kennzahlen-Cockpit (Verlauf) */
@@ -278,6 +280,10 @@
   .acc-sub{margin-top:8px;}
   .acc-sub>summary{list-style:none; cursor:pointer; color:var(--teal); font-size:12px;}
   .acc-sub>summary::-webkit-details-marker{display:none;}
+  .rt-group{margin-bottom:7px; border:1px solid var(--line); border-radius:10px; padding:8px 12px; background:#0f1f33;}
+  .rt-group>summary{color:var(--txt); font-weight:600; font-size:13px;}
+  .rt-group>summary::before{content:'▸ '; color:var(--dim);}
+  .rt-group[open]>summary::before{content:'▾ ';}
   .rm-item{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-top:1px solid #1b2b45;}
   .rm-item:first-of-type{border-top:none;}
   .rm-when{font-size:12px; font-weight:700; flex:none; width:96px;}
@@ -374,7 +380,7 @@
     <div class="pblock" id="todayMobility"></div>
     <div id="mobilityEditor" class="hide" style="margin-bottom:14px;">
       <textarea id="mobilityText" class="editta" spellcheck="false" style="height:180px"></textarea>
-      <p class="hint">Je Zeile eine Übung: <b>Name | Detail</b>. „Übung des Tages" rotiert automatisch.</p>
+      <p class="hint"><b># Gruppenname</b> als Überschrift, darunter je Zeile eine Übung <b>Name | Detail</b>. „Übung des Tages" rotiert automatisch aus allen.</p>
       <div class="row"><button class="btn sm" id="mobSave">Speichern</button><button class="btn ghost sm" id="mobCancel">Abbrechen</button></div>
     </div>
     <details class="acc-block" id="checkinAcc"><summary>📝 Tages-Check-in<span id="checkinStatus" style="font-size:12px;color:var(--teal);font-weight:400;margin-left:auto;margin-right:8px;"></span></summary><div id="todayCheckin" style="background:#12253d; border:1px solid var(--line); border-top:none; border-radius:0 0 12px 12px; padding:12px 14px;"></div></details>
@@ -579,13 +585,21 @@ Reis + Hähnchen · Pho · Zitronengrassuppe · PakChoi
 Nüsse + dunkle Schoko ≥85 %
 Laktosefreier Joghurt · hartgekochtes Ei · Karotten
 > Protein/Fett statt Zucker — hält den Blutzucker stabil.`,
-              mobilityText:`Chin Tucks | Kinn zurück ("Doppelkinn"), 10× 5 s halten — gegen Forward-Head
-Nacken-Dehnung | Ohr sanft Richtung Schulter, 30 s je Seite (linker Levator/Trapez)
-Brustwirbelsäule aufrichten | über die Stuhllehne strecken — der eigentliche Treiber
+              mobilityText:`# Atem & Nervensystem
+Zwerchfellatmung (liegend) | 2×5 Min morgens/abends im Bett — Hand auf dem Bauch MUSS sich heben, nicht die Brust. Kern gegen die Grundspannung.
+Body-Scan an Triggern | Händewaschen / rote Ampel: Kiefer – Schultern – Bauch durchgehen und 3 Sek bewusst loslassen
+Physiological Sigh | bei akuter Anspannung: 2× kurz einatmen, langer Ausatem
+# Brust & Schultern
+Brustöffnung am Türrahmen | 60 Sek, Arm auf Schulterhöhe, Körper wegdrehen — gegen die Schwimmer-Schulter
 Schulterblätter zusammenziehen | Rudern, gegen den Rundrücken
-Mikropause | alle 30–60 Min: Chin Tuck + Schultern kreisen
-Kiefer locker | tagsüber "Zähne locker, Zunge am Gaumen"
-FaceFormer ONE clear | Übungen konsequent machen (Ursache; ersetzt keinen Zahnschutz)`,
+Chin Tucks | Kinn zurück ("Doppelkinn"), 10× 5 Sek — gegen Forward-Head
+Brustwirbelsäule aufrichten | über die Stuhllehne strecken
+# Beweglichkeit
+Hüftbeuger-Dehnung | 2×60 Sek pro Seite: Ausfallschritt, hinteres Knie am Boden, Becken nach vorn, Po anspannen
+Nacken-Dehnung | Ohr sanft Richtung Schulter, 30 Sek je Seite (linker Levator/Trapez)
+# Kiefer
+FaceFormer ONE clear | konsequent üben (Ursache; ersetzt keinen Zahnschutz)
+Kiefer locker | tagsüber "Zähne locker, Zunge am Gaumen"`,
   auditVer:1, auditDone:{}, labsVer:1, labHistory:[],
   audit:[
     {key:'darm', name:'Darm-Aufbau (Muco-Reihe + Colibiogen)', dose:'morgens nüchtern + abends',
@@ -1214,6 +1228,7 @@ $('#icsBtn').addEventListener('click',exportIcs);
 function save(){ try{ localStorage.setItem('atem', JSON.stringify(state.settings)); }catch(e){} }
 function load(){ try{ const d=JSON.parse(localStorage.getItem('atem')); if(d) Object.assign(state.settings,d); }catch(e){}
   if((state.settings.planVer||0) < DEF.planVer){ state.settings.planText=DEF.planText; state.settings.planVer=DEF.planVer; save(); }
+  if((state.settings.mobilityVer||0) < 2){ state.settings.mobilityText=DEF.mobilityText; state.settings.mobilityVer=2; save(); }
   if((state.settings.auditVer||0) < DEF.auditVer){ state.settings.audit=DEF.audit; state.settings.auditVer=DEF.auditVer; if(!state.settings.auditDone) state.settings.auditDone={}; save(); }
   if(!state.settings.labHistory || !state.settings.labHistory.length){ const b={}; LAB_MARKERS.forEach(m=>{ if(m.base!=null) b[m.k]=m.base; }); state.settings.labHistory=[{date:'2026-04-15', src:'Eurofins Lab4more 04/2026', vals:b}]; state.settings.labsVer=DEF.labsVer; save(); } }
 
@@ -1921,14 +1936,23 @@ function renderTraining(){ const el=$('#todayTraining'); if(!el) return;
 $('#nutriEditBtn').addEventListener('click',()=>{ $('#nutritionText').value=state.settings.nutritionText; $('#nutriEditor').classList.remove('hide'); $('#nutritionBlocks').classList.add('hide'); $('#nutriEditBtn').classList.add('hide'); });
 $('#nutriCancel').addEventListener('click',()=>{ $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); });
 $('#nutriSave').addEventListener('click',()=>{ state.settings.nutritionText=$('#nutritionText').value; save(); $('#nutriEditor').classList.add('hide'); $('#nutritionBlocks').classList.remove('hide'); $('#nutriEditBtn').classList.remove('hide'); renderNutrition(); toast('Ernährung gespeichert.'); });
-function parseMobility(text){ return (text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{ const p=l.split('|').map(s=>s.trim()); return {name:p[0]||'', detail:p[1]||''}; }); }
+function parseMobility(text){ const groups=[]; let cur=null;
+  (text||'').split(/\r?\n/).forEach(raw=>{ const l=raw.trim(); if(!l) return;
+    if(l.startsWith('#')){ cur={name:l.replace(/^#+\s*/,''), items:[]}; groups.push(cur); return; }
+    if(!cur){ cur={name:'Übungen', items:[]}; groups.push(cur); }
+    const p=l.split('|').map(s=>s.trim()); cur.items.push({name:p[0]||'', detail:p[1]||''}); });
+  return groups; }
 function renderMobility(){
-  const items=parseMobility(state.settings.mobilityText); if(!items.length){ $('#todayMobility').innerHTML=''; return; }
-  const hi=items[Math.floor(Date.now()/86400000)%items.length];
-  const list=items.map(it=>`<div class="pitem-info">• ${esc(it.name)}${it.detail?` <span style="color:var(--dim)">· ${esc(it.detail)}</span>`:''}</div>`).join('');
-  $('#todayMobility').innerHTML=`<h3><span>🧎 Haltung & Kiefer</span><span style="font-size:12px;color:var(--teal);cursor:pointer" id="mobEditBtn">bearbeiten</span></h3>`
-    +`<div style="background:#15304e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:.5px">Übung des Tages</div><div style="font-size:14px;margin-top:2px"><b>${esc(hi.name)}</b>${hi.detail?` — ${esc(hi.detail)}`:''}</div></div>`
-    +`<details class="acc-sub"><summary>alle Übungen anzeigen</summary><div style="margin-top:6px;">${list}</div></details>`;
+  const groups=parseMobility(state.settings.mobilityText); const all=groups.flatMap(g=>g.items);
+  if(!all.length){ $('#todayMobility').innerHTML=''; return; }
+  const hi=all[Math.floor(Date.now()/86400000)%all.length];
+  const groupsHtml=groups.map((g,gi)=>{
+    const items=g.items.map(it=>`<div class="pitem-info">• ${esc(it.name)}${it.detail?` <span style="color:var(--dim)">· ${esc(it.detail)}</span>`:''}</div>`).join('');
+    return `<details class="acc-sub rt-group"${gi===0?' open':''}><summary>${esc(g.name)} <span style="color:var(--dim)">(${g.items.length})</span></summary><div style="margin-top:6px;">${items}</div></details>`;
+  }).join('');
+  $('#todayMobility').innerHTML=`<h3><span>🧘 Tägliche Übungen & Routinen</span><span style="font-size:12px;color:var(--teal);cursor:pointer" id="mobEditBtn">bearbeiten</span></h3>`
+    +`<div style="background:#15304e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;"><div style="font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:.5px">Übung des Tages</div><div style="font-size:14px;margin-top:2px"><b>${esc(hi.name)}</b>${hi.detail?` — ${esc(hi.detail)}`:''}</div></div>`
+    +groupsHtml;
   const eb=$('#mobEditBtn'); if(eb) eb.addEventListener('click',()=>{ $('#mobilityText').value=state.settings.mobilityText; $('#mobilityEditor').classList.remove('hide'); $('#todayMobility').classList.add('hide'); });
 }
 $('#mobSave').addEventListener('click',()=>{ state.settings.mobilityText=$('#mobilityText').value; save(); $('#mobilityEditor').classList.add('hide'); $('#todayMobility').classList.remove('hide'); renderMobility(); toast('Übungen gespeichert.'); });
@@ -1952,8 +1976,9 @@ let focusIdx=null;
 function renderBreathFocus(){ const el=$('#breathFocus'); if(!el) return;
   if(focusIdx==null) focusIdx=Math.floor(Date.now()/86400000)%VIS_FOCI.length;
   const f=VIS_FOCI[focusIdx%VIS_FOCI.length];
-  el.innerHTML=`<div class="bfocus-h">🎯 Fokus für diese Übung<span class="bfocus-more" title="anderer Fokus">↻</span></div><div class="bfocus-t"><b>${esc(f.t)}</b> — ${esc(f.x)}</div>`;
-  const m=el.querySelector('.bfocus-more'); if(m) m.addEventListener('click',e=>{ e.stopPropagation(); focusIdx=(focusIdx+1)%VIS_FOCI.length; renderBreathFocus(); });
+  const wasOpen=el.querySelector('details')?.open;
+  el.innerHTML=`<details class="bfocus-det"${wasOpen?' open':''}><summary>🎯 Fokus: ${esc(f.t)}</summary><div class="bfocus-t">${esc(f.x)} <span class="bfocus-more" title="anderer Fokus">↻ anderer</span></div></details>`;
+  const m=el.querySelector('.bfocus-more'); if(m) m.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); focusIdx=(focusIdx+1)%VIS_FOCI.length; renderBreathFocus(); const d=el.querySelector('details'); if(d) d.open=true; });
 }
 let spruchIdx=null;
 function renderSpruch(){ const el=$('#todaySpruch'); if(!el) return;
